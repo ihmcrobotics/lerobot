@@ -7,18 +7,21 @@ def main(dataset_path: str) -> None:
 
     print(f"Dataset path: {dataset_path}")
 
+    # Using a tolerance setting which is considerably larger than the default
     dataset = LeRobotDataset(f'root/{dataset_path.name}', dataset_path, tolerance_s=0.1)
     dataset.load_hf_dataset()
     dataset.episode_buffer = dataset.create_episode_buffer()
 
     for frame_index in range(dataset.num_frames):
 
+        timestamp = dataset[frame_index]["timestamp"];
+
         frame = {
             "action": [0, 1],
             "timestamp": 0.1,
         }
 
-        dataset.add_frame(frame)
+        # dataset.add_frame(frame)
 
 
     dataset.save_episode()
