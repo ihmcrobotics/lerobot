@@ -48,14 +48,28 @@ def main(dataset_path: str) -> None:
 
         # Iterate over frames in this episode
         for frame_idx in range(start_frame_idx, end_frame_idx):
-            timestamp = dataset[frame_idx]["timestamp"]
+            # Get the frame data from the dataset
+            frame_data = dataset[frame_idx]
+            timestamp = frame_data["timestamp"]
 
-            frame = {
-                "action": [0, 1],
-                "timestamp": 0.1,
-            }
+            # Create a complete frame dictionary with all necessary data
+            frame = {}
 
-            # dataset.add_frame(frame)
+            # Add all keys from frame_data except those that are automatically handled
+            for key in frame_data:
+                # Skip keys that are automatically handled by add_frame
+                if key not in ["index", "episode_index", "frame_index", "task_index"]:
+                    frame[key] = frame_data[key]
+
+            # Make sure to use the actual timestamp
+            frame["timestamp"] = timestamp
+
+            # Add task if available
+            if "task" in frame_data:
+                frame["task"] = frame_data["task"]
+
+            # FIXME Generates validate_frame error
+            dataset.add_frame(frame)
 
     # Save episode after processing all episodes and frames
     dataset.save_episode()
