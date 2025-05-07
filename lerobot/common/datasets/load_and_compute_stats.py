@@ -12,18 +12,27 @@ def main(dataset_path: str) -> None:
     dataset.load_hf_dataset()
     dataset.episode_buffer = dataset.create_episode_buffer()
 
-    for frame_index in range(dataset.num_frames):
+    # Get episode data index to iterate over episodes and frames
+    episode_data_index = dataset.episode_data_index
 
-        timestamp = dataset[frame_index]["timestamp"];
+    # Iterate over episodes
+    for episode_idx in range(dataset.num_episodes):
+        # Get the start and end frame indices for this episode
+        start_frame_idx = episode_data_index["from"][episode_idx].item()
+        end_frame_idx = episode_data_index["to"][episode_idx].item()
 
-        frame = {
-            "action": [0, 1],
-            "timestamp": 0.1,
-        }
+        # Iterate over frames in this episode
+        for frame_idx in range(start_frame_idx, end_frame_idx):
+            timestamp = dataset[frame_idx]["timestamp"]
 
-        # dataset.add_frame(frame)
+            frame = {
+                "action": [0, 1],
+                "timestamp": 0.1,
+            }
 
+            # dataset.add_frame(frame)
 
+    # Save episode after processing all episodes and frames
     dataset.save_episode()
 
 if __name__ == "__main__":
