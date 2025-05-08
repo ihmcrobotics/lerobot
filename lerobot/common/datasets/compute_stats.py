@@ -85,16 +85,27 @@ def get_feature_stats(array: np.ndarray, axis: tuple, keepdims: bool) -> dict[st
 def compute_episode_stats(episode_data: dict[str, list[str] | np.ndarray], features: dict) -> dict:
     ep_stats = {}
     for key, data in episode_data.items():
+        if key not in features:
+            continue  # Skip keys that are not in features
         if features[key]["dtype"] == "string":
             continue  # HACK: we should receive np.arrays of strings
-        elif features[key]["dtype"] in ["image", "video"]:
+        if features[key]["dtype"] in ["image", "video"]:
             ep_ft_array = sample_images(data)  # data is a list of image paths
             axes_to_reduce = (0, 2, 3)  # keep channel dim
             keepdims = True
         else:
-            ep_ft_array = data  # data is already a np.ndarray
+            # Convert list to numpy array if needed
+            if isinstance(data, list):
+                ep_ft_array = np.stack(data)
+            else:
+                ep_ft_array = data # data is already a np.ndarray
+
+            # Convert scalar values to numpy arrays
+            if not isinstance(ep_ft_array, np.ndarray):
+                ep_ft_array = np.array([ep_ft_array])
+
             axes_to_reduce = 0  # compute stats over the first axis
-            keepdims = data.ndim == 1  # keep as np.array
+            keepdims = ep_ft_array.ndim == 1  # keep as np.array
 
         ep_stats[key] = get_feature_stats(ep_ft_array, axis=axes_to_reduce, keepdims=keepdims)
 

@@ -757,8 +757,10 @@ def validate_feature_numpy_array(
         if actual_dtype != np.dtype(expected_dtype):
             error_message += f"The feature '{name}' of dtype '{actual_dtype}' is not of the expected dtype '{expected_dtype}'.\n"
 
+        # Special case for scalar values (shape '()') when expecting shape '(1,)'
         if actual_shape != expected_shape:
-            error_message += f"The feature '{name}' of shape '{actual_shape}' does not have the expected shape '{expected_shape}'.\n"
+            if not (len(expected_shape) == 1 and expected_shape[0] == 1 and actual_shape == ()):
+                error_message += f"The feature '{name}' of shape '{actual_shape}' does not have the expected shape '{expected_shape}'.\n"
     else:
         error_message += f"The feature '{name}' is not a 'np.ndarray'. Expected type is '{expected_dtype}', but type '{type(value)}' provided instead.\n"
 
@@ -770,8 +772,10 @@ def validate_feature_image_or_video(name: str, expected_shape: list[str], value:
     error_message = ""
     if isinstance(value, np.ndarray):
         actual_shape = value.shape
-        c, h, w = expected_shape
-        if len(actual_shape) != 3 or (actual_shape != (c, h, w) and actual_shape != (h, w, c)):
+        # Convert expected_shape values to integers if they are strings
+        c, h, w = [int(dim) if isinstance(dim, str) else dim for dim in expected_shape]
+        # Check if the shape is 3D and matches either (c,h,w) or (h,w,c)
+        if len(actual_shape) != 3 or (actual_shape != (c, h, w) and actual_shape != (h, w, c) and actual_shape != (w, c, h)):
             error_message += f"The feature '{name}' of shape '{actual_shape}' does not have the expected shape '{(c, h, w)}' or '{(h, w, c)}'.\n"
     elif isinstance(value, PILImage.Image):
         pass
