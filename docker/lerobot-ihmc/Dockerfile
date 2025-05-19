@@ -18,7 +18,24 @@ RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86
  && rm ~/miniconda.sh
 ENV PATH=$CONDA_DIR/bin:$PATH
 
-USER robotlab
+ARG HOST_USER
+ARG HOST_GID
+ARG HOST_GROUP
+
+# Setup a robotlab user as the development user, to avoid using root.
+RUN adduser --home /home/$HOST_USER --gecos "Rosie Robot,1117,1234567,2345678" --ingroup $HOST_GROUP --disabled-password $HOST_USER \
+ && chown -R $HOST_USER /home/$HOST_USER \
+ && adduser $HOST_USER sudo \
+ && echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+USER $HOST_USER
+WORKDIR /home/$HOST_USER
+
+# Make sure the .config folder exists and is owned by the host user.
+# This is useful for later installed apps.
+RUN mkdir -p /home/$HOST_USER/.config
+RUN chown -R $HOST_USER:$HOST_GROUP /home/$HOST_USER/.config
+
+USER $HOST_USER
 
 RUN conda init bash
 

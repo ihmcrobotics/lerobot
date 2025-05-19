@@ -15,4 +15,4 @@ fi
 USERNAME="$1"
 
 # Transfer the current directory to the remote server using rsync
-rsync -avz "$PWD" "$USERNAME"@gpu2.ihmc.us:/home/"$USERNAME"/
+rsync -avz --exclude='.git' "$PWD" "$USERNAME"@gpu2.ihmc.us:/home/"$USERNAME"/
