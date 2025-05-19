@@ -1,0 +1,17 @@
+#!/bin/bash
+# Immediately exit on any errors.
+set -e
+# Print commands as they are run.
+set -o xtrace
+
+docker run \
+    --tty \
+    --interactive \
+    --rm \
+    --dns=1.1.1.1 \
+    --env "TERM=xterm-256color" `# Enable color in the terminal` \
+    --privileged \
+    --gpus all \
+    --volume /home/$USER/lerobot:/home/robotlab/lerobot \
+    --volume /home/$USER/datasets:/home/robotlab/datasets \
+    ihmcrobotics/lerobot-ihmc:0.1 bash
