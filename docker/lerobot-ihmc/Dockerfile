@@ -33,3 +33,5 @@ RUN git clone https://github.com/ihmcrobotics/lerobot.git
 WORKDIR lerobot
 
 RUN conda run -n lerobot pip install -e ".[aloha, pusht]"
+
+RUN echo 'alias cal="conda activate lerobot"' >> ~/.bashrc
