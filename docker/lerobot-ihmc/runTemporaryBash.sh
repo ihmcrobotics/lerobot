@@ -12,6 +12,6 @@ docker run \
     --env "TERM=xterm-256color" `# Enable color in the terminal` \
     --privileged \
     --gpus all \
-    --volume /home/$USER/lerobot:/home/robotlab/lerobot \
-    --volume /home/$USER/datasets:/home/robotlab/datasets \
+    --volume /home/$USER/lerobot:/lerobot \
+    --volume /home/$USER/datasets:/datasets \
     ihmcrobotics/lerobot-ihmc:0.1 bash

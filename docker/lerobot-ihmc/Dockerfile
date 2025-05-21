@@ -1,15 +1,25 @@
-FROM ihmcrobotics/nvidia:0.6
+FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
 
-USER root
+ARG DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get --quiet 2 --yes update \
- && apt-get --quiet 2 --yes install \
-    cmake \
+RUN apt-get update && apt-get install -y \
     build-essential \
+    curl \
+    zip \
+    unzip \
+    wget \
+    git \
+    cmake \
+    apt-transport-https \
+    iputils-ping \
+    ca-certificates \
+    software-properties-common \
+    python3-opencv \
+    iproute2 \
     libglib2.0-0 libgl1-mesa-glx libegl1-mesa ffmpeg \
     speech-dispatcher libgeos-dev \
-    > /dev/null \
- && rm -rf /var/lib/apt/lists/*
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Download and install Miniconda
 ENV CONDA_DIR=/opt/conda
@@ -17,25 +27,6 @@ RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86
  && /bin/bash ~/miniconda.sh -b -p $CONDA_DIR \
  && rm ~/miniconda.sh
 ENV PATH=$CONDA_DIR/bin:$PATH
-
-ARG HOST_USER
-ARG HOST_GID
-ARG HOST_GROUP
-
-# Setup a robotlab user as the development user, to avoid using root.
-RUN adduser --home /home/$HOST_USER --gecos "Rosie Robot,1117,1234567,2345678" --ingroup $HOST_GROUP --disabled-password $HOST_USER \
- && chown -R $HOST_USER /home/$HOST_USER \
- && adduser $HOST_USER sudo \
- && echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
-USER $HOST_USER
-WORKDIR /home/$HOST_USER
-
-# Make sure the .config folder exists and is owned by the host user.
-# This is useful for later installed apps.
-RUN mkdir -p /home/$HOST_USER/.config
-RUN chown -R $HOST_USER:$HOST_GROUP /home/$HOST_USER/.config
-
-USER $HOST_USER
 
 RUN conda init bash
 
@@ -52,3 +43,5 @@ WORKDIR lerobot
 RUN conda run -n lerobot pip install -e ".[aloha, pusht]"
 
 RUN echo 'alias cal="conda activate lerobot"' >> ~/.bashrc
+
+WORKDIR /datasets
