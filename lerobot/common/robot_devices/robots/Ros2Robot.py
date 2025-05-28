@@ -80,6 +80,7 @@ class Ros2Robot(Node):
         self.get_logger().debug(f'Received joints: {msg.position}')
 
     def _command_callback(self, msg: String):
+        #TODO: Figure out how to make this have connect wait on it
         pass
 
     def _image_callback(self, msg: Image):
