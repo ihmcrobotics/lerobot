@@ -25,7 +25,6 @@ class Ros2Robot(Node):
             10
         )
 
-        # --- Subscriber for joint states ---
         self.joint_state_sub = self.create_subscription(
             JointState,
             config.joint_state_topic,
@@ -89,9 +88,6 @@ class Ros2Robot(Node):
         return angles, image
 
     def disconnect(self):
-        """
-        Clean up before shutdown.
-        """
         self.get_logger().info('Shutting down...')
         self.destroy_node()
         rclpy.shutdown()

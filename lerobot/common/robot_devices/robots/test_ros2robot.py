@@ -50,27 +50,23 @@ def test_send_action_connected():
     msg = robot.action_pub.published[0]
     assert isinstance(msg, Float32MultiArray)
     assert list(msg.data) == [1.5, -2.5]
-
     assert robot._count == 1
 
 
-def test_on_timer_publishes_zero_action():
+def test_send_action_connected_14_joints():
     config = Ros2RobotConfig(mock=True)
     robot = Ros2Robot(config)
 
+    robot.action_pub = DummyPublisher()
     robot.connect()
     robot._count = 0
-    js = JointState()
-    js.position = [0.0, 0.0, 0.0]
-    robot.latest_joints = js
 
-    robot.action_pub = DummyPublisher()
-
-    robot._on_timer()
-
+    t = torch.arange(14, dtype=torch.float32)
+    robot.send_action(t)
     assert len(robot.action_pub.published) == 1
     msg = robot.action_pub.published[0]
-    assert list(msg.data) == [0.0, 0.0, 0.0]
+    assert isinstance(msg, Float32MultiArray)
+    assert list(msg.data) == list(np.arange(14, dtype=np.float32))
     assert robot._count == 1
 
 
@@ -86,20 +82,29 @@ def test_image_callback_converts_to_cv2():
     assert robot.latest_image.shape == (64, 64, 3)
     assert np.array_equal(robot.latest_image, cv_img)
 
-def test_capture_observation():
+
+def test_capture_observation_multiple_images():
     config = Ros2RobotConfig(mock=True)
     robot = Ros2Robot(config)
 
+    # Set joints to 14 values
     js = JointState()
-    js.position = [1.0, 2.0, 3.0]
+    js.position = [float(i) for i in range(14)]
     robot.latest_joints = js
 
-    dummy_img = np.random.randint(0, 255, (64, 64, 3), dtype=np.uint8)
-    robot.latest_image = dummy_img
+    # First image observation
+    dummy_img1 = np.random.randint(0, 255, (3, 640, 480), dtype=np.uint8)
+    robot.latest_image = dummy_img1
+    angles1, image1 = robot.capture_observation()
+    assert angles1 == [float(i) for i in range(14)]
+    assert isinstance(image1, np.ndarray)
+    assert image1.shape == (3, 640, 480)
+    assert np.array_equal(image1, dummy_img1)
 
-    angles, image = robot.capture_observation()
-
-    assert angles == [1.0, 2.0, 3.0]
-    assert isinstance(image, np.ndarray)
-    assert image.shape == (64, 64, 3)
-    assert np.array_equal(image, dummy_img)
+    # Second image observation
+    dummy_img2 = np.random.randint(0, 255, (3, 640, 480), dtype=np.uint8)
+    robot.latest_image = dummy_img2
+    angles2, image2 = robot.capture_observation()
+    assert angles2 == [float(i) for i in range(14)]
+    assert image2.shape == (3, 640, 480)
+    assert np.array_equal(image2, dummy_img2)
