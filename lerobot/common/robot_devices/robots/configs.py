@@ -683,12 +683,14 @@ class Ros2RobotConfig(ManipulatorRobotConfig):
     # → ROS topics
     subscribers: dict[str, tuple[type, str, int]] = field(
         default_factory=lambda: {
+            # TODO: Change to actual subscribers
             '/joint_states': (JointState, '_joint_state_callback', 10),
             '/camera/image_raw': (Image, '_image_callback', 10),
         }
     )
     publishers: dict[str, tuple[type, int]] = field(
         default_factory=lambda: {
+            # TODO: Change to actual publishers
             '/robot/action': (Float32MultiArray, 10),
         }
     )
