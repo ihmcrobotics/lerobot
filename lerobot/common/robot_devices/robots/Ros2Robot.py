@@ -24,29 +24,18 @@ class Ros2Robot(Node):
         self.config = config
 
         # Publisher for sending actions to the robot
-        self.action_pub = self.create_publisher(
-            Float32MultiArray,
-            config.action_topic,
-            10
-        )
-
+        for topic, (msg_type, qos) in config.publishers.items():
+            attr = topic.strip('/').replace('/', '_') + '_pub'
+            setattr(self, attr, self.create_publisher(msg_type, topic, qos))
         # Subscriber for receiving joint state updates
-        self.joint_state_sub = self.create_subscription(
-            JointState,
-            config.joint_state_topic,
-            self._joint_state_callback,
-            10
-        )
+        self._bridge = None
+        for topic, (msg_type, cb_name, qos) in config.subscribers.items():
+            callback = getattr(self, cb_name)
+            attr = topic.strip('/').replace('/','_') + '_sub'
+            setattr(self, attr, self.create_subscription(msg_type, topic, callback, qos))
 
-        # Subscriber for receiving image frames if an image topic is configured
-        if config.image_topic is not None:
-            self.image_sub = self.create_subscription(
-                Image,
-                config.image_topic,
-                self._image_callback,
-                10
-            )
-            self._bridge = CvBridge()
+            if msg_type is Image and self._bridge is None:
+                self._bridge = CvBridge()
 
         # Timer for periodic control callbacks at the configured frequency
         period = 1.0 / config.control_frequency
@@ -137,5 +126,6 @@ class Ros2Robot(Node):
         Logs the shutdown and destroys the node.
         """
         self.get_logger().info('Shutting down...')
+        self.is_connected = False
         self.destroy_node()
         rclpy.shutdown()

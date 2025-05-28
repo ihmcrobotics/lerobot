@@ -675,14 +675,23 @@ class LeKiwiRobotConfig(RobotConfig):
 
     mock: bool = False
 
-
+from sensor_msgs.msg import JointState, Image
+from std_msgs.msg import Float32MultiArray
 @RobotConfig.register_subclass("ros2robot")
 @dataclass
 class Ros2RobotConfig(ManipulatorRobotConfig):
     # → ROS topics
-    joint_state_topic: str     = '/joint_states'
-    image_topic: str | None    = '/camera/image_raw'
-    action_topic: str          = '/robot/action'
+    subscribers: dict[str, tuple[type, str, int]] = field(
+        default_factory=lambda: {
+            '/joint_states': (JointState, '_joint_state_callback', 10),
+            '/camera/image_raw': (Image, '_image_callback', 10),
+        }
+    )
+    publishers: dict[str, tuple[type, int]] = field(
+        default_factory=lambda: {
+            '/robot/action': (Float32MultiArray, 10),
+        }
+    )
 
     # → Control loop
     control_frequency: float   = 20.0  # Hz
@@ -704,6 +713,7 @@ class Ros2RobotConfig(ManipulatorRobotConfig):
             ),
         }
     )
+
     cameras: dict[str, CameraConfig] = field(default_factory=lambda: {})
 
     # → Optional limits & modes
