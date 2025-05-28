@@ -674,3 +674,26 @@ class LeKiwiRobotConfig(RobotConfig):
     )
 
     mock: bool = False
+
+
+@RobotConfig.register_subclass("ros2robot")
+@dataclass
+class Ros2RobotConfig(ManipulatorRobotConfig):
+    calibration_dir: str = field(default_factory=lambda: ".cache/calibration/")
+    leader_arms: dict[str, MotorsBusConfig] = field(
+        default_factory=lambda: {
+            "main": DynamixelMotorsBusConfig(
+                port="/dev/tty.usbmodem585A0077581",
+                motors={"joint1": [1, "xl330-m077"]},
+                mock=False,
+            )
+        }
+    )
+    cameras: dict[str, CameraConfig] = field(default_factory=lambda: {})
+
+    # no limits on relative targets by default
+    max_relative_target: float | None = None
+    # no torque‐mode gripper by default
+    gripper_open_degree: float | None = None
+    # set to True to mock all motors & cameras
+    mock: bool = False
