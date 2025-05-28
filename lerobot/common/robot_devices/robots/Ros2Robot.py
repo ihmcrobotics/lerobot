@@ -57,7 +57,6 @@ class Ros2Robot(Node):
     def send_action(self, action: torch.Tensor):
         """
         Publish the provided action tensor to the robot.
-
         If not connected, logs a warning and drops the message.
         Converts the tensor to a Float32MultiArray message before publishing.
         """
@@ -107,7 +106,6 @@ class Ros2Robot(Node):
     def capture_observation(self) -> Tuple[List[float], Optional[np.ndarray]]:
         """
         Retrieve the latest observations from the robot.
-
         Returns:
             angles: List of the most recent joint positions (floats).
             image: Most recent camera frame as an OpenCV array, or None if not available.

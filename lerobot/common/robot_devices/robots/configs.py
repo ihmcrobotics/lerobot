@@ -680,7 +680,7 @@ from std_msgs.msg import Float32MultiArray, String
 @RobotConfig.register_subclass("ros2robot")
 @dataclass
 class Ros2RobotConfig(ManipulatorRobotConfig):
-    # → ROS topics
+    # ROS topics
     subscribers: dict[str, tuple[type, str, int]] = field(
         default_factory=lambda: {
             # I believe these are corrct
@@ -698,11 +698,12 @@ class Ros2RobotConfig(ManipulatorRobotConfig):
         }
     )
 
-    # → Control loop
+    # Control loop
     control_frequency: float   = 20.0  # Hz
 
-    # → Calibration & hardware buses
-    calibration_dir: str       = field(default_factory=lambda: ".cache/calibration/lekiwi")
+    # Calibration & hardware buses
+    # Calibration Dir needs to be changed
+    calibration_dir: str = field(default_factory=lambda: ".cache/calibration/lekiwi")
     leader_arms: dict[str, MotorsBusConfig] = field(
         default_factory=lambda: {
             "main": FeetechMotorsBusConfig(
@@ -721,7 +722,5 @@ class Ros2RobotConfig(ManipulatorRobotConfig):
 
     cameras: dict[str, CameraConfig] = field(default_factory=lambda: {})
 
-    # → Optional limits & modes
-    max_relative_target: float | None = None
-    gripper_open_degree:  float | None = None
-    mock:                  bool        = False
+    # Optional limits & modes
+    mock: bool = False
