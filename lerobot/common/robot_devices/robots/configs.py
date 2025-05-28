@@ -687,7 +687,7 @@ class Ros2RobotConfig(ManipulatorRobotConfig):
             '/zed/left/color': (Image, '_image_callback', 10),
             '/zed/right/color': (Image, '_image_callback', 10),
             '/lerobot/state/hand_poses': (Float32MultiArray, '_joint_state_callback', 10),
-            '/lerrobot/command': (String, '_command_callback', 10),
+            '/lerobot/command': (String, '_command_callback', 10),
         }
     )
     publishers: dict[str, tuple[type, int]] = field(
