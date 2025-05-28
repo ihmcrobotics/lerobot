@@ -4,7 +4,7 @@ from rclpy.node import Node
 import torch
 import numpy as np
 
-from std_msgs.msg import Float32MultiArray
+from std_msgs.msg import Float32MultiArray, String
 from sensor_msgs.msg import JointState, Image
 from cv_bridge import CvBridge
 
@@ -27,13 +27,11 @@ class Ros2Robot(Node):
         for topic, (msg_type, qos) in config.publishers.items():
             attr = topic.strip('/').replace('/', '_') + '_pub'
             setattr(self, attr, self.create_publisher(msg_type, topic, qos))
-        # Subscriber for receiving joint state updates
         self._bridge = None
         for topic, (msg_type, cb_name, qos) in config.subscribers.items():
             callback = getattr(self, cb_name)
             attr = topic.strip('/').replace('/','_') + '_sub'
             setattr(self, attr, self.create_subscription(msg_type, topic, callback, qos))
-
             if msg_type is Image and self._bridge is None:
                 self._bridge = CvBridge()
 
@@ -80,6 +78,9 @@ class Ros2Robot(Node):
         """
         self.latest_joints = msg
         self.get_logger().debug(f'Received joints: {msg.position}')
+
+    def _command_callback(self, msg: String):
+        pass
 
     def _image_callback(self, msg: Image):
         """

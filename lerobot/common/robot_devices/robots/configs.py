@@ -676,7 +676,7 @@ class LeKiwiRobotConfig(RobotConfig):
     mock: bool = False
 
 from sensor_msgs.msg import JointState, Image
-from std_msgs.msg import Float32MultiArray
+from std_msgs.msg import Float32MultiArray, String
 @RobotConfig.register_subclass("ros2robot")
 @dataclass
 class Ros2RobotConfig(ManipulatorRobotConfig):
@@ -686,13 +686,15 @@ class Ros2RobotConfig(ManipulatorRobotConfig):
             # I believe these are corrct
             '/zed/left/color': (Image, '_image_callback', 10),
             '/zed/right/color': (Image, '_image_callback', 10),
-            '/lerobot/state/hand_poses': (Float32MultiArray, '_joint_state_callback', 10)
+            '/lerobot/state/hand_poses': (Float32MultiArray, '_joint_state_callback', 10),
+            '/lerrobot/command': (String, '_command_callback', 10),
         }
     )
     publishers: dict[str, tuple[type, int]] = field(
         default_factory=lambda: {
             # I believe these are correct
             '/lerobot/action/hand_poses': (Float32MultiArray, 10),
+            '/lerobot/status': (String, 10),
         }
     )
 
