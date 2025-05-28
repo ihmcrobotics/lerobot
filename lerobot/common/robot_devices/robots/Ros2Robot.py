@@ -50,22 +50,14 @@ class Ros2Robot(Node):
         self.is_connected = False
 
     def connect(self):
-        """
-        Bring up connections / initialize robot-specific comms if needed.
-        """
         self.get_logger().info('Connecting to robot...')
         self.is_connected = True
         self.get_logger().info('Connected.')
 
     def send_action(self, action: torch.Tensor):
-        """
-        Publish a torch.Tensor action to the robot.
-        """
         if not self.is_connected:
             self.get_logger().warning('Not connected: dropping action')
             return
-
-        # Convert to NumPy, then to Float32MultiArray
         arr = action.detach().cpu().numpy().astype(np.float32)
         msg = Float32MultiArray(data=arr.flatten().tolist())
         self.action_pub.publish(msg)
@@ -73,46 +65,25 @@ class Ros2Robot(Node):
         self._count += 1
 
     def _joint_state_callback(self, msg: JointState):
-        """
-        Callback for incoming joint states.
-        """
         self.latest_joints = msg
         self.get_logger().debug(f'Received joints: {msg.position}')
 
     def _image_callback(self, msg: Image):
-        """
-        Callback for incoming camera images.
-        """
         cv_img = self._bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         self.latest_image = cv_img
         self.get_logger().debug('Received new image frame')
 
     def _on_timer(self):
-        """
-        Timer callback: compute and send the next action based on latest observations.
-        """
         if self.latest_joints is None:
-            # Haven't received any data yet
             return
-
-        # Example: a no-op action of zeros, same size as joints
         desired = torch.zeros(len(self.latest_joints.position))
         self.send_action(desired)
 
     def capture_observation(self) -> Tuple[List[float], Optional[np.ndarray]]:
-        """
-        Returns a tuple (joint_positions, image).
-
-        - joint_positions: a list of the most recent JointState.position values
-        - image: the most recent camera frame as an OpenCV (numpy) array, or None if no image topic is configured
-        """
-        # Extract joint angles
         if hasattr(self, 'latest_joints') and self.latest_joints is not None:
             angles: List[float] = list(self.latest_joints.position)
         else:
             angles = []
-
-        # Extract image (if any)
         image: Optional[np.ndarray] = getattr(self, 'latest_image', None)
 
         return angles, image
@@ -122,7 +93,6 @@ class Ros2Robot(Node):
         Clean up before shutdown.
         """
         self.get_logger().info('Shutting down...')
-        # If you created any other resources, close them here.
         self.destroy_node()
         rclpy.shutdown()
 
