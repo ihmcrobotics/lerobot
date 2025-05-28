@@ -679,21 +679,34 @@ class LeKiwiRobotConfig(RobotConfig):
 @RobotConfig.register_subclass("ros2robot")
 @dataclass
 class Ros2RobotConfig(ManipulatorRobotConfig):
-    calibration_dir: str = field(default_factory=lambda: ".cache/calibration/")
+    # → ROS topics
+    joint_state_topic: str     = '/joint_states'
+    image_topic: str | None    = '/camera/image_raw'
+    action_topic: str          = '/robot/action'
+
+    # → Control loop
+    control_frequency: float   = 20.0  # Hz
+
+    # → Calibration & hardware buses
+    calibration_dir: str       = field(default_factory=lambda: ".cache/calibration/lekiwi")
     leader_arms: dict[str, MotorsBusConfig] = field(
         default_factory=lambda: {
-            "main": DynamixelMotorsBusConfig(
+            "main": FeetechMotorsBusConfig(
                 port="/dev/tty.usbmodem585A0077581",
-                motors={"joint1": [1, "xl330-m077"]},
-                mock=False,
-            )
+                motors={
+                    "shoulder_pan":  [1, "sts3215"],
+                    "shoulder_lift": [2, "sts3215"],
+                    "elbow_flex":    [3, "sts3215"],
+                    "wrist_flex":    [4, "sts3215"],
+                    "wrist_roll":    [5, "sts3215"],
+                    "gripper":       [6, "sts3215"],
+                },
+            ),
         }
     )
     cameras: dict[str, CameraConfig] = field(default_factory=lambda: {})
 
-    # no limits on relative targets by default
+    # → Optional limits & modes
     max_relative_target: float | None = None
-    # no torque‐mode gripper by default
-    gripper_open_degree: float | None = None
-    # set to True to mock all motors & cameras
-    mock: bool = False
+    gripper_open_degree:  float | None = None
+    mock:                  bool        = False

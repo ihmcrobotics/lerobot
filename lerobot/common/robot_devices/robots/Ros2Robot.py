@@ -104,3 +104,6 @@ class Ros2Robot(Node):
         # If you created any other resources, close them here.
         self.destroy_node()
         rclpy.shutdown()
+
+
+
