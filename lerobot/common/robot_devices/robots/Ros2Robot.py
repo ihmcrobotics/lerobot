@@ -8,6 +8,9 @@ from std_msgs.msg import Float32MultiArray
 from sensor_msgs.msg import JointState, Image
 from cv_bridge import CvBridge
 
+from typing import Optional, Tuple, List
+import numpy as np
+
 from lerobot.common.robot_devices.robots.configs import Ros2RobotConfig
 
 
@@ -95,6 +98,24 @@ class Ros2Robot(Node):
         # Example: a no-op action of zeros, same size as joints
         desired = torch.zeros(len(self.latest_joints.position))
         self.send_action(desired)
+
+    def capture_observation(self) -> Tuple[List[float], Optional[np.ndarray]]:
+        """
+        Returns a tuple (joint_positions, image).
+
+        - joint_positions: a list of the most recent JointState.position values
+        - image: the most recent camera frame as an OpenCV (numpy) array, or None if no image topic is configured
+        """
+        # Extract joint angles
+        if hasattr(self, 'latest_joints') and self.latest_joints is not None:
+            angles: List[float] = list(self.latest_joints.position)
+        else:
+            angles = []
+
+        # Extract image (if any)
+        image: Optional[np.ndarray] = getattr(self, 'latest_image', None)
+
+        return angles, image
 
     def disconnect(self):
         """
