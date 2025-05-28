@@ -9,22 +9,28 @@ from sensor_msgs.msg import JointState, Image
 from cv_bridge import CvBridge
 
 from typing import Optional, Tuple, List
-import numpy as np
 
 from lerobot.common.robot_devices.robots.configs import Ros2RobotConfig
 
 
 class Ros2Robot(Node):
     def __init__(self, config: Ros2RobotConfig):
+        """
+        Initialize the ROS2 robot node.
+        Sets up publishers for actions, subscribers for joint states and images,
+        a control timer, and state variables to track the latest observations.
+        """
         super().__init__('ros2robot')
         self.config = config
 
+        # Publisher for sending actions to the robot
         self.action_pub = self.create_publisher(
             Float32MultiArray,
             config.action_topic,
             10
         )
 
+        # Subscriber for receiving joint state updates
         self.joint_state_sub = self.create_subscription(
             JointState,
             config.joint_state_topic,
@@ -32,6 +38,7 @@ class Ros2Robot(Node):
             10
         )
 
+        # Subscriber for receiving image frames if an image topic is configured
         if config.image_topic is not None:
             self.image_sub = self.create_subscription(
                 Image,
@@ -41,22 +48,36 @@ class Ros2Robot(Node):
             )
             self._bridge = CvBridge()
 
+        # Timer for periodic control callbacks at the configured frequency
         period = 1.0 / config.control_frequency
         self.timer = self.create_timer(period, self._on_timer)
-        self.latest_joints = None
-        self.latest_image = None
-        self._count = 0
-        self.is_connected = False
+
+        # Initialize state variables
+        self.latest_joints = None  # type: Optional[JointState]
+        self.latest_image = None   # type: Optional[np.ndarray]
+        self._count = 0            # Counter for action messages
+        self.is_connected = False  # Connection status flag
 
     def connect(self):
+        """
+        Mark the robot as connected and enable sending actions.
+        Logs connection status to the ROS2 console.
+        """
         self.get_logger().info('Connecting to robot...')
         self.is_connected = True
         self.get_logger().info('Connected.')
 
     def send_action(self, action: torch.Tensor):
+        """
+        Publish the provided action tensor to the robot.
+
+        If not connected, logs a warning and drops the message.
+        Converts the tensor to a Float32MultiArray message before publishing.
+        """
         if not self.is_connected:
             self.get_logger().warning('Not connected: dropping action')
             return
+        # Convert action tensor to numpy and then to ROS message
         arr = action.detach().cpu().numpy().astype(np.float32)
         msg = Float32MultiArray(data=arr.flatten().tolist())
         self.action_pub.publish(msg)
@@ -64,33 +85,57 @@ class Ros2Robot(Node):
         self._count += 1
 
     def _joint_state_callback(self, msg: JointState):
+        """
+        Callback invoked when a new JointState message arrives.
+        Stores the latest joint positions for later retrieval.
+        """
         self.latest_joints = msg
         self.get_logger().debug(f'Received joints: {msg.position}')
 
     def _image_callback(self, msg: Image):
+        """
+        Callback invoked when a new Image message arrives.
+        Converts the ROS Image message to an OpenCV image and stores it.
+        """
         cv_img = self._bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         self.latest_image = cv_img
         self.get_logger().debug('Received new image frame')
 
     def _on_timer(self):
+        """
+        Timer callback running at the control frequency.
+        If joint states are available, sends a zero-action command.
+        """
+        # Do nothing until at least one joint state is received
         if self.latest_joints is None:
             return
+        # Create a zero-action vector matching the number of joints
         desired = torch.zeros(len(self.latest_joints.position))
         self.send_action(desired)
 
     def capture_observation(self) -> Tuple[List[float], Optional[np.ndarray]]:
+        """
+        Retrieve the latest observations from the robot.
+
+        Returns:
+            angles: List of the most recent joint positions (floats).
+            image: Most recent camera frame as an OpenCV array, or None if not available.
+        """
+        # Extract joint positions if available
         if hasattr(self, 'latest_joints') and self.latest_joints is not None:
             angles: List[float] = list(self.latest_joints.position)
         else:
             angles = []
+        # Extract the latest image frame if available
         image: Optional[np.ndarray] = getattr(self, 'latest_image', None)
 
         return angles, image
 
     def disconnect(self):
+        """
+        Cleanly shut down the ROS2 node and stop all processing.
+        Logs the shutdown and destroys the node.
+        """
         self.get_logger().info('Shutting down...')
         self.destroy_node()
         rclpy.shutdown()
-
-
-
