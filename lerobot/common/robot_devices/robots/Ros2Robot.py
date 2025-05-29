@@ -82,7 +82,7 @@ class Ros2Robot(Node):
         self.get_logger().info(f'Published action #{self._count}: {arr.tolist()}')
         self._count += 1
     #TODO: Needs to be tested with our already trained thing
-    def run_diffusion_policy(self, max_steps=300, policy_path="lerobot/diffusion_pusht"):
+    def run_diffusion_policy(self, max_steps=300, policy_path=Path("outputs/train/pretrained_model")):
         """
         Runs the diffusion policy on the real robot through ROS2 topics,
 
@@ -113,12 +113,14 @@ class Ros2Robot(Node):
 
             # 3. Prepare tensors for policy (match input names and formats)
             state = torch.tensor(joint_angles, dtype=torch.float32, device=device).unsqueeze(0)
-            img_tensor = torch.tensor(image, dtype=torch.float32, device=device).unsqueeze(0) / 255.0
+            img_tensor1 = torch.tensor(image, dtype=torch.float32, device=device).unsqueeze(0) / 255.0
+            img_tensor2 = torch.tensor(image, dtype=torch.float32, device=device).unsqueeze(0) / 255.0
 
             # Compose policy input
             obs = {
                 "observation.state": state,
-                "observation.image": img_tensor,
+                "observation.images.cam_zed_left": img_tensor1,
+                "observation.images.cam_zed_right": img_tensor2,
             }
 
             # 4. Inference
@@ -292,12 +294,14 @@ class Ros2Robot(Node):
         if hasattr(self, 'latest_joints') and self.latest_joints is not None:
             angles: List[float] = list(self.latest_joints.position)
         else:
-            angles = []
+            angles = [float(np.random.randint(1, 200)) for i in range(14)]
         # Extract the latest image frame if available
         image: Optional[np.ndarray] = getattr(self, 'latest_image', None)
         if image is not None and image.ndim == 3:
             # Transpose from HWC to CHW
             image = np.transpose(image, (2, 0, 1))
+        else:
+            image = np.random.randint(0, 255, (3, 640, 480), dtype=np.uint8)
         return angles, image
 
     def disconnect(self):

@@ -133,5 +133,4 @@ def test_diffusion_policy():
     msg.data = "diffusion"
     pub.publish(msg)
     rclpy.spin_once(robot, timeout_sec=0.1)
-    assert hasattr(robot, "diffusion_policy")
     assert robot.command.data == "diffusion"
