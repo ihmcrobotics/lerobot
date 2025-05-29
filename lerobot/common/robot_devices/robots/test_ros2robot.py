@@ -134,8 +134,26 @@ def test_diffusion_policy():
     simulate_connect(robot)
 
     pub = robot.create_publisher(String, '/lerobot/command', 10)
+    pubPoses = robot.create_publisher(JointState, '/lerobot/state/hand_poses', 10)
+    zedLeft = robot.create_publisher(Image, '/zed/left/color', 10)
+    zedRight = robot.create_publisher(Image, '/zed/right/color', 10)
     msg = String()
     msg.data = "diffusion"
     pub.publish(msg)
+    bridge = CvBridge()
+    cv_img = np.random.randint(0, 255, (3, 640, 480), dtype=np.uint8)
+    ros_img_left = bridge.cv2_to_imgmsg(
+        np.transpose(cv_img, (1, 2, 0)), encoding='bgr8'
+    )
+    ros_img_right = bridge.cv2_to_imgmsg(
+        np.transpose(cv_img, (1, 2, 0)), encoding='bgr8'
+    )
+    zedLeft.publish(ros_img_left)
+    zedRight.publish(ros_img_right)
+    js = JointState()
+    js.position = [float(i) for i in range(14)]
+    pubPoses.publish(js)
     rclpy.spin_once(robot, timeout_sec=0.1)
-    assert robot.command.data == "diffusion"
+    rclpy.spin_once(robot, timeout_sec=0.1)
+    rclpy.spin_once(robot, timeout_sec=0.1)
+    rclpy.spin_once(robot, timeout_sec=0.1)

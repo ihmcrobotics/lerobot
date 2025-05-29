@@ -207,20 +207,16 @@ class Ros2Robot(Node):
         if hasattr(self, 'latest_joints') and self.latest_joints is not None:
             angles: List[float] = list(self.latest_joints.position)
         else:
-            angles = [np.random.randint(0,200) for _ in range(14)]
+            angles = None
         # Extract the latest image frame if available
         image_left: Optional[np.ndarray] = getattr(self, 'latest_image_left', None)
         if image_left is not None and image_left.ndim == 3:
             # Transpose from HWC to CHW
             image_left = np.transpose(image_left, (2, 0, 1))
-        else:
-            image_left = np.random.randint(0, 255, (3, 640, 480), dtype=np.uint8)
         image_right: Optional[np.ndarray] = getattr(self, 'latest_image_right', None)
         if image_right is not None and image_right.ndim == 3:
             # Transpose from HWC to CHW
             image_right = np.transpose(image_right, (2, 0, 1))
-        else:
-            image_right = np.random.randint(0, 255, (3, 640, 480), dtype=np.uint8)
         return angles, image_left, image_right
 
     def disconnect(self):
