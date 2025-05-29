@@ -81,7 +81,64 @@ class Ros2Robot(Node):
         self.lerobot_action_hand_poses_pub.publish(msg)
         self.get_logger().debug(f'Published action #{self._count}: {arr.tolist()}')
         self._count += 1
+    #TODO: Needs to be tested with our already trained thing
+    '''
+    def run_diffusion_policy(self, max_steps=300, policy_path="lerobot/diffusion_pusht"):
+        """
+        Runs the diffusion policy on the real robot through ROS2 topics,
 
+        Args:
+            max_steps (int): Number of steps to run.
+            policy_path (str): HF repo ID or local path for the pretrained policy.
+        """
+        import torch
+        from pathlib import Path
+        from lerobot.common.policies.diffusion.modeling_diffusion import DiffusionPolicy
+
+        # 1. Load policy and select device
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        policy = DiffusionPolicy.from_pretrained(policy_path)
+        policy.to(device)
+        policy.reset()
+
+        self.get_logger().info(f"Running diffusion policy for up to {max_steps} steps...")
+
+        step = 0
+        while step < max_steps and self.is_connected:
+            # 2. Capture observation from ROS
+            joint_angles, image = self.capture_observation()
+            # Wait until both are available
+            if not joint_angles or image is None:
+                rclpy.spin_once(self, timeout_sec=0.05)
+                continue
+
+            # 3. Prepare tensors for policy (match input names and formats)
+            state = torch.tensor(joint_angles, dtype=torch.float32, device=device).unsqueeze(0)
+            img_tensor = torch.tensor(image, dtype=torch.float32, device=device).unsqueeze(0) / 255.0
+
+            # Compose policy input
+            obs = {
+                "observation.state": state,
+                "observation.image": img_tensor,
+            }
+
+            # 4. Inference
+            with torch.no_grad():
+                action = policy.select_action(obs)
+                action = action.squeeze(0)
+
+            # 5. Send action to robot
+            self.send_action(action)
+
+            # 6. Optional: Logging
+            self.get_logger().info(f"Step {step}: Action sent.")
+
+            # 7. Wait for next observation
+            rclpy.spin_once(self, timeout_sec=0.05)
+            step += 1
+
+        self.get_logger().info("Diffusion policy run complete or robot disconnected.")
+    '''
     def diffusion_policy(self):
         output_directory = Path("outputs/eval/example_pusht_diffusion")
         output_directory.mkdir(parents=True, exist_ok=True)
