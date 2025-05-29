@@ -79,7 +79,7 @@ class Ros2Robot(Node):
         arr = action.detach().cpu().numpy().astype(np.float32)
         msg = Float32MultiArray(data=arr.flatten().tolist())
         self.lerobot_action_hand_poses_pub.publish(msg)
-        self.get_logger().debug(f'Published action #{self._count}: {arr.tolist()}')
+        self.get_logger().info(f'Published action #{self._count}: {arr.tolist()}')
         self._count += 1
     #TODO: Needs to be tested with our already trained thing
     '''
@@ -241,7 +241,7 @@ class Ros2Robot(Node):
         Stores the latest joint positions for later retrieval.
         """
         self.latest_joints = msg
-        self.get_logger().debug(f'Received joints: {msg.position}')
+        self.get_logger().info(f'Received joints: {msg.position}')
 
     def _connect_callback(self, msg: String):
         """
@@ -253,7 +253,7 @@ class Ros2Robot(Node):
 
     def _command_callback(self, msg: String):
         self.command = msg
-        self.get_logger().debug(f'Received command: {msg.data}')
+        self.get_logger().info(f'Received command: {msg.data}')
         if self.command.data == '':
             return
         elif self.command.data == 'diffusion':
@@ -266,7 +266,7 @@ class Ros2Robot(Node):
         """
         cv_img = self._bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         self.latest_image = cv_img
-        self.get_logger().debug('Received new image frame')
+        self.get_logger().info('Received new image frame')
 
     def _status_callback(self, msg: String):
         """
@@ -274,7 +274,7 @@ class Ros2Robot(Node):
         Sets the policy type to recieved message
         """
         self.policy_status = msg
-        self.get_logger().debug(f'Received status message: {msg}')
+        self.get_logger().info(f'Received status message: {msg}')
 
     def _on_timer(self):
         """
