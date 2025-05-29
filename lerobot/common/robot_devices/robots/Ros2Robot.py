@@ -41,7 +41,7 @@ class Ros2Robot(Node):
         self.timer = self.create_timer(period, self._on_timer)
 
         # Initialize state variables
-        self.command_event = threading.Event()
+        self.connect_event = threading.Event()
         self.policy_status = ""
         self.latest_joints = None  # type: Optional[JointState]
         self.latest_image = None   # type: Optional[np.ndarray]
@@ -54,7 +54,7 @@ class Ros2Robot(Node):
         Logs connection status to the ROS2 console.
         """
         self.get_logger().info('Waiting for /lerobot/command to connect...')
-        self.command_event.wait()  # Blocks here until _command_callback sets the event
+        self.connect_event.wait()  # Blocks here until _command_callback sets the event
         self.get_logger().info('Command received. Connecting to robot...')
         self.is_connected = True
         self.get_logger().info('Connected.')
@@ -82,13 +82,16 @@ class Ros2Robot(Node):
         self.latest_joints = msg
         self.get_logger().debug(f'Received joints: {msg.position}')
 
-    def _command_callback(self, msg: String):
+    def _connect_callback(self, msg: String):
         """
-        Callback for the /lerobot/command topic.
+        Callback for the /lerobot/connect topic.
         Triggers the connection process when a message is received.
         """
-        self.get_logger().info(f'Received command: {msg.data}')
-        self.command_event.set()
+        self.get_logger().info(f'Received connect: {msg.data}')
+        self.connect_event.set()
+
+    def _command_callback(self, msg: String):
+        pass
 
     def _image_callback(self, msg: Image):
         """

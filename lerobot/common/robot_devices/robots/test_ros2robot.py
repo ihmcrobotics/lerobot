@@ -17,10 +17,10 @@ def init_ros():
 
 def simulate_connect(robot: Ros2Robot, message: str = "connect"):
     """
-    Publish a String on '/lerobot/command' and spin once
+    Publish a String on '/lerobot/connect' and spin once
     so that robot.connect() will unblock.
     """
-    cmd_pub = robot.create_publisher(String, '/lerobot/command', 10)
+    cmd_pub = robot.create_publisher(String, '/lerobot/connect', 10)
     rclpy.spin_once(robot, timeout_sec=0.1)
     msg = String()
     msg.data = message
