@@ -106,3 +106,18 @@ def test_capture_observation_via_ros2():
     assert isinstance(image, np.ndarray)
     assert image.shape == (3, 640, 480)
     assert np.array_equal(image, cv_img)
+
+
+def test_status_subscription_sets_policy_status():
+    config = Ros2RobotConfig(mock=True)
+    robot = Ros2Robot(config)
+    simulate_connect(robot)
+
+    pub = robot.create_publisher(String, '/lerobot/status', 10)
+    msg = String()
+    msg.data = "MyPolicyRunning"
+    pub.publish(msg)
+    rclpy.spin_once(robot, timeout_sec=0.1)
+
+    assert hasattr(robot, "policy_status")
+    assert robot.policy_status.data == "MyPolicyRunning"
