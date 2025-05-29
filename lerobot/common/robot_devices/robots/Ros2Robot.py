@@ -42,6 +42,7 @@ class Ros2Robot(Node):
 
         # Initialize state variables
         self.command_event = threading.Event()
+        self.policy_status = ""
         self.latest_joints = None  # type: Optional[JointState]
         self.latest_image = None   # type: Optional[np.ndarray]
         self._count = 0            # Counter for action messages
@@ -69,7 +70,7 @@ class Ros2Robot(Node):
         # Convert action tensor to numpy and then to ROS message
         arr = action.detach().cpu().numpy().astype(np.float32)
         msg = Float32MultiArray(data=arr.flatten().tolist())
-        self.action_pub.publish(msg)
+        self.lerobot_action_hand_poses_pub.publish(msg)
         self.get_logger().debug(f'Published action #{self._count}: {arr.tolist()}')
         self._count += 1
 
@@ -98,6 +99,14 @@ class Ros2Robot(Node):
         self.latest_image = cv_img
         self.get_logger().debug('Received new image frame')
 
+    def _status_callback(self, msg: String):
+        """
+        Callback invoked when a new status message arrives.
+        Sets the policy type to recieved message
+        """
+        self.policy_status = msg
+        self.get_logger().debug(f'Received status message: {msg}')
+
     def _on_timer(self):
         """
         Timer callback running at the control frequency.
@@ -111,12 +120,6 @@ class Ros2Robot(Node):
         self.send_action(desired)
 
     def capture_observation(self) -> Tuple[List[float], Optional[np.ndarray]]:
-        """
-        Retrieve the latest observations from the robot.
-        Returns:
-            angles: List of the most recent joint positions (floats).
-            image: Most recent camera frame as an OpenCV array, or None if not available.
-        """
         # Extract joint positions if available
         if hasattr(self, 'latest_joints') and self.latest_joints is not None:
             angles: List[float] = list(self.latest_joints.position)
@@ -124,7 +127,9 @@ class Ros2Robot(Node):
             angles = []
         # Extract the latest image frame if available
         image: Optional[np.ndarray] = getattr(self, 'latest_image', None)
-
+        if image is not None and image.ndim == 3:
+            # Transpose from HWC to CHW
+            image = np.transpose(image, (2, 0, 1))
         return angles, image
 
     def disconnect(self):
