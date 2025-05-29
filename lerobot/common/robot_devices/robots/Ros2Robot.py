@@ -106,22 +106,22 @@ class Ros2Robot(Node):
         step = 0
         while step < max_steps and self.is_connected:
             # 2. Capture observation from ROS
-            joint_angles, image = self.capture_observation()
+            joint_angles, image_left, image_right = self.capture_observation()
             # Wait until both are available
-            if not joint_angles or image is None:
+            if not joint_angles or image_left is None or image_right is None:
                 rclpy.spin_once(self, timeout_sec=0.05)
                 continue
 
             # 3. Prepare tensors for policy (match input names and formats)
             state = torch.tensor(joint_angles, dtype=torch.float32, device=device).unsqueeze(0)
-            img_tensor_left = torch.tensor(image, dtype=torch.float32, device=device).unsqueeze(0) / 255.0
-            img_tensor_right = torch.tensor(image, dtype=torch.float32, device=device).unsqueeze(0) / 255.0
+            img_tensor_left = torch.tensor(image_left, dtype=torch.float32, device=device).unsqueeze(0) / 255.0
+            img_tensor_right = torch.tensor(image_right, dtype=torch.float32, device=device).unsqueeze(0) / 255.0
 
             # Compose policy input
             obs = {
                 "observation.state": state,
-                "observation.images.cam_zed_left": img_tensor1,
-                "observation.images.cam_zed_right": img_tensor2,
+                "observation.images.cam_zed_left": img_tensor_left,
+                "observation.images.cam_zed_right": img_tensor_right,
             }
 
             # 4. Inference
@@ -207,20 +207,20 @@ class Ros2Robot(Node):
         if hasattr(self, 'latest_joints') and self.latest_joints is not None:
             angles: List[float] = list(self.latest_joints.position)
         else:
-            angles = []
+            angles = [np.random.randint(0,200) for _ in range(14)]
         # Extract the latest image frame if available
         image_left: Optional[np.ndarray] = getattr(self, 'latest_image_left', None)
         if image_left is not None and image_left.ndim == 3:
             # Transpose from HWC to CHW
             image_left = np.transpose(image_left, (2, 0, 1))
-        # else:
-        #     image_left = np.random.randint(0, 255, (3, 640, 480), dtype=np.uint8)
+        else:
+            image_left = np.random.randint(0, 255, (3, 640, 480), dtype=np.uint8)
         image_right: Optional[np.ndarray] = getattr(self, 'latest_image_right', None)
         if image_right is not None and image_right.ndim == 3:
             # Transpose from HWC to CHW
             image_right = np.transpose(image_right, (2, 0, 1))
-        # else:
-        #     image_right = np.random.randint(0, 255, (3, 640, 480), dtype=np.uint8)
+        else:
+            image_right = np.random.randint(0, 255, (3, 640, 480), dtype=np.uint8)
         return angles, image_left, image_right
 
     def disconnect(self):
