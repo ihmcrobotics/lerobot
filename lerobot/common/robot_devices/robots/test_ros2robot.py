@@ -4,9 +4,10 @@ import rclpy
 import pytest
 import torch
 import numpy as np
+import threading
 from unittest.mock import MagicMock
 
-from std_msgs.msg import Float32MultiArray
+from std_msgs.msg import Float32MultiArray, String
 from sensor_msgs.msg import JointState, Image
 from lerobot.common.robot_devices.robots.configs import Ros2RobotConfig
 from Ros2Robot import Ros2Robot
@@ -17,6 +18,14 @@ def init_ros():
     rclpy.init(args=None)
     yield
     rclpy.shutdown()
+
+def simulate_connect(robot: Ros2Robot, message: str = "connect"):
+    command_pub = robot.create_publisher(String, '/lerobot/command', 10)
+    msg = String()
+    msg.data = message
+    threading.Thread(target=lambda: rclpy.spin_once(robot, timeout_sec=1.0)).start()
+    command_pub.publish(msg)
+    robot.connect()
 
 
 class DummyPublisher:
@@ -41,7 +50,9 @@ def test_send_action_connected():
     robot = Ros2Robot(config)
 
     robot.action_pub = DummyPublisher()
-    robot.connect()
+
+    simulate_connect(robot)
+
     robot._count = 0
 
     t = torch.tensor([1.5, -2.5])
@@ -58,7 +69,7 @@ def test_send_action_connected_14_joints():
     robot = Ros2Robot(config)
 
     robot.action_pub = DummyPublisher()
-    robot.connect()
+    simulate_connect(robot)
     robot._count = 0
 
     t = torch.arange(14, dtype=torch.float32)
@@ -73,6 +84,9 @@ def test_send_action_connected_14_joints():
 def test_image_callback_converts_to_cv2():
     config = Ros2RobotConfig(mock=True)
     robot = Ros2Robot(config)
+    robot.action_pub = DummyPublisher()
+    simulate_connect(robot)
+    robot._count = 0
     cv_img = np.random.randint(0, 255, (64, 64, 3), dtype=np.uint8)
     robot._bridge = MagicMock()
     robot._bridge.imgmsg_to_cv2 = lambda msg, desired_encoding: cv_img
@@ -86,7 +100,9 @@ def test_image_callback_converts_to_cv2():
 def test_capture_observation_multiple_images():
     config = Ros2RobotConfig(mock=True)
     robot = Ros2Robot(config)
-
+    robot.action_pub = DummyPublisher()
+    simulate_connect(robot)
+    robot._count = 0
     # Set joints to 14 values
     js = JointState()
     js.position = [float(i) for i in range(14)]

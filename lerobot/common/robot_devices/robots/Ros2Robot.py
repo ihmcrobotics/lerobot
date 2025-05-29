@@ -3,6 +3,7 @@ from rclpy.node import Node
 
 import torch
 import numpy as np
+import threading
 
 from std_msgs.msg import Float32MultiArray, String
 from sensor_msgs.msg import JointState, Image
@@ -40,6 +41,7 @@ class Ros2Robot(Node):
         self.timer = self.create_timer(period, self._on_timer)
 
         # Initialize state variables
+        self.command_event = threading.Event()
         self.latest_joints = None  # type: Optional[JointState]
         self.latest_image = None   # type: Optional[np.ndarray]
         self._count = 0            # Counter for action messages
@@ -50,10 +52,11 @@ class Ros2Robot(Node):
         Mark the robot as connected and enable sending actions.
         Logs connection status to the ROS2 console.
         """
-        self.get_logger().info('Connecting to robot...')
+        self.get_logger().info('Waiting for /lerobot/command to connect...')
+        self.command_event.wait()  # Blocks here until _command_callback sets the event
+        self.get_logger().info('Command received. Connecting to robot...')
         self.is_connected = True
         self.get_logger().info('Connected.')
-
     def send_action(self, action: torch.Tensor):
         """
         Publish the provided action tensor to the robot.
@@ -79,8 +82,12 @@ class Ros2Robot(Node):
         self.get_logger().debug(f'Received joints: {msg.position}')
 
     def _command_callback(self, msg: String):
-        #TODO: Figure out how to make this have connect wait on it
-        pass
+        """
+        Callback for the /lerobot/command topic.
+        Triggers the connection process when a message is received.
+        """
+        self.get_logger().info(f'Received command: {msg.data}')
+        self.command_event.set()
 
     def _image_callback(self, msg: Image):
         """
