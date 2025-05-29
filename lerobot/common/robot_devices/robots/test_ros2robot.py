@@ -123,6 +123,7 @@ def test_status_subscription_sets_policy_status():
     assert robot.policy_status.data == "MyPolicyRunning"
 
 def test_diffusion_policy():
+    #TODO: Need Fake Data to be sent for this to work
     config = Ros2RobotConfig(mock=True)
     robot = Ros2Robot(config)
     simulate_connect(robot)
