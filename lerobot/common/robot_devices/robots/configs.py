@@ -699,30 +699,7 @@ class Ros2RobotConfig(ManipulatorRobotConfig):
             '/lerobot/status': (String, 10),
         }
     )
-
     # Control loop
     control_frequency: float   = 20.0  # Hz
-
-    # Calibration & hardware buses
-    # Calibration Dir needs to be changed
-    calibration_dir: str = field(default_factory=lambda: ".cache/calibration/lekiwi")
-    leader_arms: dict[str, MotorsBusConfig] = field(
-        default_factory=lambda: {
-            "main": FeetechMotorsBusConfig(
-                port="/dev/tty.usbmodem585A0077581",
-                motors={
-                    "shoulder_pan":  [1, "sts3215"],
-                    "shoulder_lift": [2, "sts3215"],
-                    "elbow_flex":    [3, "sts3215"],
-                    "wrist_flex":    [4, "sts3215"],
-                    "wrist_roll":    [5, "sts3215"],
-                    "gripper":       [6, "sts3215"],
-                },
-            ),
-        }
-    )
-
-    cameras: dict[str, CameraConfig] = field(default_factory=lambda: {})
-
     # Optional limits & modes
     mock: bool = False
