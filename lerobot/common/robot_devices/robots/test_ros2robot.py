@@ -77,9 +77,9 @@ def test_image_subscription_converts_to_cv2():
     pub.publish(ros_img)
     rclpy.spin_once(robot, timeout_sec=0.1)
 
-    assert isinstance(robot.latest_image_left, np.ndarray)
-    assert robot.latest_image_left.shape == (64, 64, 3)
-    assert np.array_equal(robot.latest_image_left, cv_img)
+    assert isinstance(robot.left_color, np.ndarray)
+    assert robot.left_color.shape == (64, 64, 3)
+    assert np.array_equal(robot.left_color, cv_img)
 
 def test_capture_observation_via_ros2():
     config = Ros2RobotConfig(mock=True)

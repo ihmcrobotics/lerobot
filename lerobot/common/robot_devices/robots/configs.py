@@ -684,9 +684,9 @@ class Ros2RobotConfig(ManipulatorRobotConfig):
     subscribers: dict[str, tuple[type, str, int]] = field(
         default_factory=lambda: {
             # I believe these are corrct
-            '/zed/left/color': (Image, '_image_left_callback', 10),
-            '/zed/right/color': (Image, '_image_right_callback', 10),
-            '/lerobot/state/hand_poses': (JointState, '_joint_state_callback', 10),
+            '/zed/left/color': (Image, '_left_color_callback', 10),
+            '/zed/right/color': (Image, '_right_color_callback', 10),
+            '/lerobot/state/hand_poses': (Float32MultiArray, '_state_hand_poses_callback', 10),
             '/lerobot/connect': (String, '_connect_callback', 10),
             '/lerobot/command': (String, '_command_callback', 10),
             '/lerobot/status': (String, '_status_callback', 10),

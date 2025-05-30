@@ -7,8 +7,6 @@ from rclpy.node import Node
 import torch
 import numpy as np
 import threading
-import gymnasium as gym
-import gym_pusht
 import imageio
 
 from std_msgs.msg import Float32MultiArray, String
@@ -42,6 +40,7 @@ class Ros2Robot(Node):
             setattr(self, attr, self.create_subscription(msg_type, topic, callback, qos))
             if msg_type is Image and self._bridge is None:
                 self._bridge = CvBridge()
+        self.get_logger().info(f'Subscribed topics: {list(config.subscribers.keys())}')
 
         # Timer for periodic control callbacks at the configured frequency
         period = 1.0 / config.control_frequency
@@ -51,9 +50,9 @@ class Ros2Robot(Node):
         self.command = ""
         self.connect_event = threading.Event()
         self.policy_status = ""
-        self.latest_joints = None  # type: Optional[JointState]
-        self.latest_image_right = None   # type: Optional[np.ndarray]
-        self.latest_image_left = None
+        self.state_hand_poses = None  # type: Optional[JointState]
+        self.right_color = None   # type: Optional[np.ndarray]
+        self.left_color = None
         self._count = 0            # Counter for action messages
         self.is_connected = False  # Connection status flag
 
@@ -62,8 +61,8 @@ class Ros2Robot(Node):
         Mark the robot as connected and enable sending actions.
         Logs connection status to the ROS2 console.
         """
-        self.get_logger().info('Waiting for /lerobot/command to connect...')
-        self.connect_event.wait()  # Blocks here until _command_callback sets the event
+        self.get_logger().info('Waiting for /lerobot/connect to connect...')
+        self.connect_event.wait()  # Blocks here until _connect_callback sets the event
         self.get_logger().info('Command received. Connecting to robot...')
         self.is_connected = True
         self.get_logger().info('Connected.')
@@ -80,6 +79,12 @@ class Ros2Robot(Node):
         arr = action.detach().cpu().numpy().astype(np.float32)
         msg = Float32MultiArray(data=arr.flatten().tolist())
         self.lerobot_action_hand_poses_pub.publish(msg)
+        status = String()
+        if self.is_connected:
+            status.data = "True"
+        else:
+            status.data = "False"
+        self.lerobot_status_pub.publish(status)
         self.get_logger().info(f'Published action #{self._count}: {arr.tolist()}')
         self._count += 1
     #TODO: Needs to be tested with our already trained thing
@@ -106,16 +111,16 @@ class Ros2Robot(Node):
         step = 0
         while step < max_steps and self.is_connected:
             # 2. Capture observation from ROS
-            joint_angles, image_left, image_right = self.capture_observation()
-            # Wait until both are available
-            if not joint_angles or image_left is None or image_right is None:
+            while not (self.state_hand_poses and self.left_color is not None and self.right_color is not None):
+                self.get_logger().info("Waiting for first observation...")
                 rclpy.spin_once(self, timeout_sec=0.05)
-                continue
+
+            state_hand_poses, left_color, right_color = self.capture_observation()
 
             # 3. Prepare tensors for policy (match input names and formats)
-            state = torch.tensor(joint_angles, dtype=torch.float32, device=device).unsqueeze(0)
-            img_tensor_left = torch.tensor(image_left, dtype=torch.float32, device=device).unsqueeze(0) / 255.0
-            img_tensor_right = torch.tensor(image_right, dtype=torch.float32, device=device).unsqueeze(0) / 255.0
+            state = torch.tensor(state_hand_poses, dtype=torch.float32, device=device).unsqueeze(0)
+            img_tensor_left = torch.tensor(left_color, dtype=torch.float32, device=device).unsqueeze(0) / 255.0
+            img_tensor_right = torch.tensor(right_color, dtype=torch.float32, device=device).unsqueeze(0) / 255.0
 
             # Compose policy input
             obs = {
@@ -141,13 +146,13 @@ class Ros2Robot(Node):
 
         self.get_logger().info("Diffusion policy run complete or robot disconnected.")
 
-    def _joint_state_callback(self, msg: JointState):
+    def _state_hand_poses_callback(self, msg: Float32MultiArray):
         """
         Callback invoked when a new JointState message arrives.
         Stores the latest joint positions for later retrieval.
         """
-        self.latest_joints = msg
-        self.get_logger().info(f'Received joints: {msg.position}')
+        self.state_hand_poses = msg
+        self.get_logger().info(f'Received joints: {msg.data}')
 
     def _connect_callback(self, msg: String):
         """
@@ -161,25 +166,28 @@ class Ros2Robot(Node):
         self.command = msg
         self.get_logger().info(f'Received command: {msg.data}')
         if self.command.data == '':
-            return
+            self.get_logger().info(f'Received empty command: {msg.data}')
         elif self.command.data == 'diffusion':
             self.run_diffusion_policy()
+        else:
+            self.get_logger().info(f'Command callback is: {msg.data}')
+            self.connect_event.set()
 
-    def _image_left_callback(self, msg: Image):
+    def _left_color_callback(self, msg: Image):
         """
         Callback invoked when a new Image message arrives.
         Converts the ROS Image message to an OpenCV image and stores it.
         """
         cv_img = self._bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-        self.latest_image_left = cv_img
+        self.left_color = cv_img
         self.get_logger().info('Received new image frame')
-    def _image_right_callback(self, msg: Image):
+    def _right_color_callback(self, msg: Image):
         """
         Callback invoked when a new Image message arrives.
         Converts the ROS Image message to an OpenCV image and stores it.
         """
         cv_img = self._bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-        self.latest_image_right = cv_img
+        self.right_color = cv_img
         self.get_logger().info('Received new image frame')
 
     def _status_callback(self, msg: String):
@@ -196,27 +204,26 @@ class Ros2Robot(Node):
         If joint states are available, sends a zero-action command.
         """
         # Do nothing until at least one joint state is received
-        if self.latest_joints is None:
+        if self.state_hand_poses is None:
             return
         # Create a zero-action vector matching the number of joints
-        desired = torch.zeros(len(self.latest_joints.position))
+        desired = torch.zeros(len(self.state_hand_poses.data))
         self.send_action(desired)
 
     def capture_observation(self) -> Tuple[List[float], Optional[np.ndarray], Optional[np.ndarray]]:
-        # Extract joint positions if available
-        if hasattr(self, 'latest_joints') and self.latest_joints is not None:
-            angles: List[float] = list(self.latest_joints.position)
+        if hasattr(self, 'state_hand_poses') and self.state_hand_poses is not None:
+            angles: List[float] = list(self.state_hand_poses.data)
         else:
             angles = None
-        # Extract the latest image frame if available
-        image_left: Optional[np.ndarray] = getattr(self, 'latest_image_left', None)
+
+        image_left: Optional[np.ndarray] = self.left_color
         if image_left is not None and image_left.ndim == 3:
-            # Transpose from HWC to CHW
             image_left = np.transpose(image_left, (2, 0, 1))
-        image_right: Optional[np.ndarray] = getattr(self, 'latest_image_right', None)
+
+        image_right: Optional[np.ndarray] = self.right_color
         if image_right is not None and image_right.ndim == 3:
-            # Transpose from HWC to CHW
             image_right = np.transpose(image_right, (2, 0, 1))
+
         return angles, image_left, image_right
 
     def disconnect(self):
@@ -228,3 +235,15 @@ class Ros2Robot(Node):
         self.is_connected = False
         self.destroy_node()
         rclpy.shutdown()
+
+def main():
+    rclpy.init()
+    config = Ros2RobotConfig()
+    robot = Ros2Robot(config)
+    spin_thread = threading.Thread(target=rclpy.spin, args=(robot,))
+    spin_thread.start()
+    robot.connect()
+
+
+if __name__ == '__main__':
+    main()
