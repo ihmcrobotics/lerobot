@@ -112,7 +112,6 @@ class Ros2Robot(Node):
         while step < max_steps and self.is_connected:
             # 2. Capture observation from ROS
             while not (self.state_hand_poses and self.left_color is not None and self.right_color is not None):
-                self.get_logger().info("Waiting for first observation...")
                 rclpy.spin_once(self, timeout_sec=0.05)
 
             state_hand_poses, left_color, right_color = self.capture_observation()
@@ -145,7 +144,8 @@ class Ros2Robot(Node):
             step += 1
 
         self.get_logger().info("Diffusion policy run complete or robot disconnected.")
-
+        time.sleep(1)
+        self.disconnect()
     def _state_hand_poses_callback(self, msg: Float32MultiArray):
         """
         Callback invoked when a new JointState message arrives.
@@ -168,7 +168,8 @@ class Ros2Robot(Node):
         if self.command.data == '':
             self.get_logger().info(f'Received empty command: {msg.data}')
         elif self.command.data == 'diffusion':
-            self.run_diffusion_policy()
+            # Launch diffusion in separate thread
+            threading.Thread(target=self.run_diffusion_policy, daemon=True).start()
         else:
             self.get_logger().info(f'Command callback is: {msg.data}')
             self.connect_event.set()
@@ -213,14 +214,17 @@ class Ros2Robot(Node):
     def capture_observation(self) -> Tuple[List[float], Optional[np.ndarray], Optional[np.ndarray]]:
         if hasattr(self, 'state_hand_poses') and self.state_hand_poses is not None:
             angles: List[float] = list(self.state_hand_poses.data)
+            self.state_hand_poses = None
         else:
             angles = None
 
         image_left: Optional[np.ndarray] = self.left_color
+        self.left_color = None
         if image_left is not None and image_left.ndim == 3:
             image_left = np.transpose(image_left, (2, 0, 1))
 
         image_right: Optional[np.ndarray] = self.right_color
+        self.right_color = None
         if image_right is not None and image_right.ndim == 3:
             image_right = np.transpose(image_right, (2, 0, 1))
 
@@ -233,6 +237,8 @@ class Ros2Robot(Node):
         """
         self.get_logger().info('Shutting down...')
         self.is_connected = False
+        status = "False"
+        self.lerobot_status_pub.publish(status)
         self.destroy_node()
         rclpy.shutdown()
 

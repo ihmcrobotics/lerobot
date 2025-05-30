@@ -35,7 +35,7 @@ class ConnectPublisher(Node):
             self.zedLeft.publish(ros_img_left)
             self.zedRight.publish(ros_img_right)
             js = Float32MultiArray()
-            js.data = [float(i) for i in range(14)]
+            js.data = [float(np.random.randint(0,200)) for _ in range(14)]
             self.pubPoses.publish(js)
             self.get_logger().info('Pre-published data for diffusion...')
             time.sleep(0.5)
@@ -53,10 +53,10 @@ class ConnectPublisher(Node):
             self.zedLeft.publish(ros_img_left)
             self.zedRight.publish(ros_img_right)
             js = Float32MultiArray()
-            js.data = [float(i) for i in range(14)]
+            js.data = [float(np.random.randint(0,200)) for _ in range(14)]
             self.pubPoses.publish(js)
             self.get_logger().info('Published live streaming data')
-            time.sleep(2)
+            time.sleep(0.5)
 
 
 def main():
