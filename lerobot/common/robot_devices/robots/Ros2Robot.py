@@ -237,7 +237,8 @@ class Ros2Robot(Node):
         """
         self.get_logger().info('Shutting down...')
         self.is_connected = False
-        status = "False"
+        status = String()
+        status.data = "False"
         self.lerobot_status_pub.publish(status)
         self.destroy_node()
         rclpy.shutdown()
