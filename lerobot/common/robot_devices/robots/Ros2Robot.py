@@ -32,6 +32,7 @@ class Ros2Robot(Node):
         # Publisher for sending actions to the robot
         for topic, (msg_type, qos) in config.publishers.items():
             attr = topic.strip('/').replace('/', '_') + '_pub'
+            print(attr)
             setattr(self, attr, self.create_publisher(msg_type, topic, qos))
         self._bridge = None
         for topic, (msg_type, cb_name, qos) in config.subscribers.items():
@@ -40,7 +41,7 @@ class Ros2Robot(Node):
             setattr(self, attr, self.create_subscription(msg_type, topic, callback, qos))
             if msg_type is Image and self._bridge is None:
                 self._bridge = CvBridge()
-        self.get_logger().info(f'Subscribed topics: {list(config.subscribers.keys())}')
+        # self.get_logger().info(f'Published topics: {list(config.publishers.keys())}')
 
         # Timer for periodic control callbacks at the configured frequency
         period = 1.0 / config.control_frequency
@@ -63,7 +64,6 @@ class Ros2Robot(Node):
         """
         self.get_logger().info('Waiting for /lerobot/connect to connect...')
         self.connect_event.wait()  # Blocks here until _connect_callback sets the event
-        self.get_logger().info('Command received. Connecting to robot...')
         self.is_connected = True
         self.get_logger().info('Connected.')
     def send_action(self, action: torch.Tensor):
@@ -85,10 +85,8 @@ class Ros2Robot(Node):
         else:
             status.data = "False"
         self.lerobot_status_pub.publish(status)
-        self.get_logger().info(f'Published action #{self._count}: {arr.tolist()}')
         self._count += 1
-    #TODO: Needs to be tested with our already trained thing
-    def run_diffusion_policy(self, max_steps=300, policy_path=Path("outputs/train/pretrained_model")):
+    def run_diffusion_policy(self, max_steps=20, policy_path=Path("outputs/train/pretrained_model")):
         """
         Runs the diffusion policy on the real robot through ROS2 topics,
 
@@ -137,8 +135,7 @@ class Ros2Robot(Node):
             self.send_action(action)
 
             # 6. Optional: Logging
-            self.get_logger().info(f"Step {step}: Action sent.")
-
+            self.get_logger().info(f'Published action #{step}')
             # 7. Wait for next observation
             rclpy.spin_once(self, timeout_sec=0.05)
             step += 1
@@ -152,19 +149,16 @@ class Ros2Robot(Node):
         Stores the latest joint positions for later retrieval.
         """
         self.state_hand_poses = msg
-        self.get_logger().info(f'Received joints: {msg.data}')
 
     def _connect_callback(self, msg: String):
         """
         Callback for the /lerobot/connect topic.
         Triggers the connection process when a message is received.
         """
-        self.get_logger().info(f'Received connect: {msg.data}')
         self.connect_event.set()
 
     def _command_callback(self, msg: String):
         self.command = msg
-        self.get_logger().info(f'Received command: {msg.data}')
         if self.command.data == '':
             self.get_logger().info(f'Received empty command: {msg.data}')
         elif self.command.data == 'diffusion':
@@ -181,7 +175,6 @@ class Ros2Robot(Node):
         """
         cv_img = self._bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         self.left_color = cv_img
-        self.get_logger().info('Received new image frame')
     def _right_color_callback(self, msg: Image):
         """
         Callback invoked when a new Image message arrives.
@@ -189,15 +182,13 @@ class Ros2Robot(Node):
         """
         cv_img = self._bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         self.right_color = cv_img
-        self.get_logger().info('Received new image frame')
 
     def _status_callback(self, msg: String):
         """
         Callback invoked when a new status message arrives.
         Sets the policy type to recieved message
         """
-        self.policy_status = msg
-        self.get_logger().info(f'Received status message: {msg}')
+        self.policy_status = msg.data
 
     def _on_timer(self):
         """
@@ -240,6 +231,8 @@ class Ros2Robot(Node):
         status = String()
         status.data = "False"
         self.lerobot_status_pub.publish(status)
+        time.sleep(2)
+        self.get_logger().info(status.data)
         self.destroy_node()
         rclpy.shutdown()
 
