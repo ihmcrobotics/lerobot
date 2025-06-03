@@ -32,7 +32,6 @@ class Ros2Robot(Node):
         # Publisher for sending actions to the robot
         for topic, (msg_type, qos) in config.publishers.items():
             attr = topic.strip('/').replace('/', '_') + '_pub'
-            print(attr)
             setattr(self, attr, self.create_publisher(msg_type, topic, qos))
         self._bridge = None
         for topic, (msg_type, cb_name, qos) in config.subscribers.items():
@@ -41,11 +40,7 @@ class Ros2Robot(Node):
             setattr(self, attr, self.create_subscription(msg_type, topic, callback, qos))
             if msg_type is Image and self._bridge is None:
                 self._bridge = CvBridge()
-        # self.get_logger().info(f'Published topics: {list(config.publishers.keys())}')
 
-        # Timer for periodic control callbacks at the configured frequency
-        period = 1.0 / config.control_frequency
-        self.timer = self.create_timer(period, self._on_timer)
 
         # Initialize state variables
         self.command = ""
@@ -56,6 +51,7 @@ class Ros2Robot(Node):
         self.left_color = None
         self._count = 0            # Counter for action messages
         self.is_connected = False  # Connection status flag
+        self.diffusion_Start = False
 
     def connect(self):
         """
@@ -63,7 +59,7 @@ class Ros2Robot(Node):
         Logs connection status to the ROS2 console.
         """
         self.get_logger().info('Waiting for /lerobot/connect to connect...')
-        self.connect_event.wait()  # Blocks here until _connect_callback sets the event
+        # self.connect_event.wait()  # Blocks here until _connect_callback sets the event
         self.is_connected = True
         self.get_logger().info('Connected.')
     def send_action(self, action: torch.Tensor):
@@ -78,15 +74,20 @@ class Ros2Robot(Node):
         # Convert action tensor to numpy and then to ROS message
         arr = action.detach().cpu().numpy().astype(np.float32)
         msg = Float32MultiArray(data=arr.flatten().tolist())
-        self.lerobot_action_hand_poses_pub.publish(msg)
-        status = String()
-        if self.is_connected:
-            status.data = "True"
-        else:
-            status.data = "False"
-        self.lerobot_status_pub.publish(status)
+        self.lerobot_lerobot_action_hand_poses_pub.publish(msg)
+
         self._count += 1
-    def run_diffusion_policy(self, max_steps=20, policy_path=Path("outputs/train/pretrained_model")):
+    def status_thread(self):
+        while self.is_connected:
+            status = String()
+            status.data = "True"
+            self.lerobot_status_pub.publish(status)
+            rclpy.spin_once(self, timeout_sec=0.5)
+        status = String()
+        status.data = "False"
+        self.lerobot_status_pub.publish(status)
+        rclpy.spin_once(self, timeout_sec=0.5)
+    def run_diffusion_policy(self, max_steps=100, policy_path=Path("outputs/train/pretrained_model")):
         """
         Runs the diffusion policy on the real robot through ROS2 topics,
 
@@ -99,6 +100,7 @@ class Ros2Robot(Node):
         from lerobot.common.policies.diffusion.modeling_diffusion import DiffusionPolicy
 
         # 1. Load policy and select device
+        self.diffusion_Start = True
         device = "cuda" if torch.cuda.is_available() else "cpu"
         policy = DiffusionPolicy.from_pretrained(policy_path)
         policy.to(device)
@@ -111,8 +113,11 @@ class Ros2Robot(Node):
             # 2. Capture observation from ROS
             while not (self.state_hand_poses and self.left_color is not None and self.right_color is not None):
                 rclpy.spin_once(self, timeout_sec=0.05)
+                rclpy.spin_once(self, timeout_sec=0.05)
+                rclpy.spin_once(self, timeout_sec=0.05)
 
             state_hand_poses, left_color, right_color = self.capture_observation()
+            self.state_hand_poses, self.left_color, self.right_color = None, None, None
 
             # 3. Prepare tensors for policy (match input names and formats)
             state = torch.tensor(state_hand_poses, dtype=torch.float32, device=device).unsqueeze(0)
@@ -159,10 +164,13 @@ class Ros2Robot(Node):
 
     def _command_callback(self, msg: String):
         self.command = msg
+        if self.diffusion_Start:
+            return
         if self.command.data == '':
             self.get_logger().info(f'Received empty command: {msg.data}')
         elif self.command.data == 'diffusion':
             # Launch diffusion in separate thread
+            self.get_logger().info(f'Received diffusion command: {msg.data}')
             threading.Thread(target=self.run_diffusion_policy, daemon=True).start()
         else:
             self.get_logger().info(f'Command callback is: {msg.data}')
@@ -174,6 +182,8 @@ class Ros2Robot(Node):
         Converts the ROS Image message to an OpenCV image and stores it.
         """
         cv_img = self._bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+        if self.left_color is None:
+            print("Got left color")
         self.left_color = cv_img
     def _right_color_callback(self, msg: Image):
         """
@@ -181,6 +191,8 @@ class Ros2Robot(Node):
         Converts the ROS Image message to an OpenCV image and stores it.
         """
         cv_img = self._bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+        if self.right_color is None:
+            print("Got right color")
         self.right_color = cv_img
 
     def _status_callback(self, msg: String):
@@ -190,32 +202,17 @@ class Ros2Robot(Node):
         """
         self.policy_status = msg.data
 
-    def _on_timer(self):
-        """
-        Timer callback running at the control frequency.
-        If joint states are available, sends a zero-action command.
-        """
-        # Do nothing until at least one joint state is received
-        if self.state_hand_poses is None:
-            return
-        # Create a zero-action vector matching the number of joints
-        desired = torch.zeros(len(self.state_hand_poses.data))
-        self.send_action(desired)
-
     def capture_observation(self) -> Tuple[List[float], Optional[np.ndarray], Optional[np.ndarray]]:
         if hasattr(self, 'state_hand_poses') and self.state_hand_poses is not None:
             angles: List[float] = list(self.state_hand_poses.data)
-            self.state_hand_poses = None
         else:
             angles = None
 
         image_left: Optional[np.ndarray] = self.left_color
-        self.left_color = None
         if image_left is not None and image_left.ndim == 3:
             image_left = np.transpose(image_left, (2, 0, 1))
 
         image_right: Optional[np.ndarray] = self.right_color
-        self.right_color = None
         if image_right is not None and image_right.ndim == 3:
             image_right = np.transpose(image_right, (2, 0, 1))
 
@@ -232,17 +229,21 @@ class Ros2Robot(Node):
         status.data = "False"
         self.lerobot_status_pub.publish(status)
         time.sleep(2)
-        self.get_logger().info(status.data)
         self.destroy_node()
         rclpy.shutdown()
 
 def main():
+    import os
+    os.environ['ROS_DOMAIN_ID'] = '185'
     rclpy.init()
     config = Ros2RobotConfig()
     robot = Ros2Robot(config)
     spin_thread = threading.Thread(target=rclpy.spin, args=(robot,))
     spin_thread.start()
+    status_thread = threading.Thread(target=robot.status_thread, args=())
     robot.connect()
+    status_thread.start()
+
 
 
 if __name__ == '__main__':
