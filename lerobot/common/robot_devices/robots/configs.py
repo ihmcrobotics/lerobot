@@ -677,19 +677,43 @@ class LeKiwiRobotConfig(RobotConfig):
 
 from sensor_msgs.msg import JointState, Image
 from std_msgs.msg import Float32MultiArray, String
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy
 @RobotConfig.register_subclass("ros2robot")
 @dataclass
 class Ros2RobotConfig(ManipulatorRobotConfig):
     # ROS topics
-    subscribers: dict[str, tuple[type, str, int]] = field(
+    subscribers: dict[str, tuple[type, str, QoSProfile]] = field(
         default_factory=lambda: {
-            # I believe these are corrct
-            '/lerobot/zed/left/color': (Image, '_left_color_callback', 10),
-            '/lerobot/zed/right/color': (Image, '_right_color_callback', 10),
-            '/lerobot/lerobot/state/hand_poses': (Float32MultiArray, '_state_hand_poses_callback', 10),
-            '/lerobot/connect': (String, '_connect_callback', 10),
-            '/lerobot/command': (String, '_command_callback', 10),
-            '/lerobot/status': (String, '_status_callback', 10),
+            '/lerobot/zed/left/color': (
+                Image,
+                '_left_color_callback',
+                QoSProfile(depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)
+            ),
+            '/lerobot/zed/right/color': (
+                Image,
+                '_right_color_callback',
+                QoSProfile(depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)
+            ),
+            '/lerobot/lerobot/state/hand_poses': (
+                Float32MultiArray,
+                '_state_hand_poses_callback',
+                QoSProfile(depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)
+            ),
+            '/lerobot/connect': (
+                String,
+                '_connect_callback',
+                QoSProfile(depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)
+            ),
+            '/lerobot/command': (
+                String,
+                '_command_callback',
+                QoSProfile(depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)
+            ),
+            '/lerobot/status': (
+                String,
+                '_status_callback',
+                QoSProfile(depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)
+            ),
         }
     )
     publishers: dict[str, tuple[type, int]] = field(

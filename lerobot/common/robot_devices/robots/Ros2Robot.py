@@ -82,11 +82,11 @@ class Ros2Robot(Node):
             status = String()
             status.data = "True"
             self.lerobot_status_pub.publish(status)
-            rclpy.spin_once(self, timeout_sec=0.5)
+            rclpy.spin_once(self, timeout_sec=0.05)
         status = String()
         status.data = "False"
         self.lerobot_status_pub.publish(status)
-        rclpy.spin_once(self, timeout_sec=0.5)
+        rclpy.spin_once(self, timeout_sec=0.05)
     def run_diffusion_policy(self, max_steps=100, policy_path=Path("outputs/train/pretrained_model")):
         """
         Runs the diffusion policy on the real robot through ROS2 topics,
@@ -105,44 +105,34 @@ class Ros2Robot(Node):
         policy = DiffusionPolicy.from_pretrained(policy_path)
         policy.to(device)
         policy.reset()
+        policy.eval()
 
         self.get_logger().info(f"Running diffusion policy for up to {max_steps} steps...")
 
         step = 0
         while step < max_steps and self.is_connected:
             # 2. Capture observation from ROS
-            while not (self.state_hand_poses and self.left_color is not None and self.right_color is not None):
-                rclpy.spin_once(self, timeout_sec=0.05)
-                rclpy.spin_once(self, timeout_sec=0.05)
-                rclpy.spin_once(self, timeout_sec=0.05)
+            if not (self.state_hand_poses and self.left_color is not None and self.right_color is not None):
+                continue
 
             state_hand_poses, left_color, right_color = self.capture_observation()
-            self.state_hand_poses, self.left_color, self.right_color = None, None, None
-
-            # 3. Prepare tensors for policy (match input names and formats)
             state = torch.tensor(state_hand_poses, dtype=torch.float32, device=device).unsqueeze(0)
             img_tensor_left = torch.tensor(left_color, dtype=torch.float32, device=device).unsqueeze(0) / 255.0
             img_tensor_right = torch.tensor(right_color, dtype=torch.float32, device=device).unsqueeze(0) / 255.0
 
-            # Compose policy input
             obs = {
                 "observation.state": state,
                 "observation.images.cam_zed_left": img_tensor_left,
                 "observation.images.cam_zed_right": img_tensor_right,
             }
 
-            # 4. Inference
             with torch.no_grad():
                 action = policy.select_action(obs)
-                action = action.squeeze(0)
+            action = action.squeeze(0)
 
-            # 5. Send action to robot
             self.send_action(action)
 
-            # 6. Optional: Logging
             self.get_logger().info(f'Published action #{step}')
-            # 7. Wait for next observation
-            rclpy.spin_once(self, timeout_sec=0.05)
             step += 1
 
         self.get_logger().info("Diffusion policy run complete or robot disconnected.")
@@ -167,7 +157,7 @@ class Ros2Robot(Node):
         if self.diffusion_Start:
             return
         if self.command.data == '':
-            self.get_logger().info(f'Received empty command: {msg.data}')
+            return
         elif self.command.data == 'diffusion':
             # Launch diffusion in separate thread
             self.get_logger().info(f'Received diffusion command: {msg.data}')
@@ -182,8 +172,7 @@ class Ros2Robot(Node):
         Converts the ROS Image message to an OpenCV image and stores it.
         """
         cv_img = self._bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-        if self.left_color is None:
-            print("Got left color")
+        # print("Got left color")
         self.left_color = cv_img
     def _right_color_callback(self, msg: Image):
         """
@@ -191,8 +180,7 @@ class Ros2Robot(Node):
         Converts the ROS Image message to an OpenCV image and stores it.
         """
         cv_img = self._bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-        if self.right_color is None:
-            print("Got right color")
+        # print("Got right color")
         self.right_color = cv_img
 
     def _status_callback(self, msg: String):
