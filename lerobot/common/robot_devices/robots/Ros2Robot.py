@@ -1,35 +1,28 @@
 import time
-
 import rclpy
-from lerobot.common.policies.diffusion.modeling_diffusion import DiffusionPolicy
 from rclpy.node import Node
-
 import torch
 import numpy as np
 import threading
-import imageio
 
 from std_msgs.msg import Float32MultiArray, String
 from sensor_msgs.msg import JointState, Image
 from cv_bridge import CvBridge
-
 from typing import Optional, Tuple, List
 from pathlib import Path
-
 from lerobot.common.robot_devices.robots.configs import Ros2RobotConfig
-
+from lerobot.common.policies.diffusion.modeling_diffusion import DiffusionPolicy
 
 class Ros2Robot(Node):
     def __init__(self, config: Ros2RobotConfig):
         """
         Initialize the ROS2 robot node.
         Sets up publishers for actions, subscribers for joint states and images,
-        a control timer, and state variables to track the latest observations.
+        and state variables to track the latest observations.
         """
         super().__init__('ros2robot')
         self.config = config
 
-        # Publisher for sending actions to the robot
         for topic, (msg_type, qos) in config.publishers.items():
             attr = topic.strip('/').replace('/', '_') + '_pub'
             setattr(self, attr, self.create_publisher(msg_type, topic, qos))
@@ -46,11 +39,11 @@ class Ros2Robot(Node):
         self.command = ""
         self.connect_event = threading.Event()
         self.policy_status = ""
-        self.state_hand_poses = None  # type: Optional[JointState]
-        self.right_color = None   # type: Optional[np.ndarray]
+        self.state_hand_poses = None
+        self.right_color = None
         self.left_color = None
-        self._count = 0            # Counter for action messages
-        self.is_connected = False  # Connection status flag
+        self._count = 0
+        self.is_connected = False
         self.diffusion_Start = False
 
     def connect(self):
@@ -77,7 +70,11 @@ class Ros2Robot(Node):
         self.lerobot_lerobot_action_hand_poses_pub.publish(msg)
 
         self._count += 1
+
     def status_thread(self):
+        """
+        Thread for sending status through ROS.
+        """
         while self.is_connected:
             status = String()
             status.data = "True"
@@ -95,11 +92,7 @@ class Ros2Robot(Node):
             max_steps (int): Number of steps to run.
             policy_path (str): HF repo ID or local path for the pretrained policy.
         """
-        import torch
-        from pathlib import Path
-        from lerobot.common.policies.diffusion.modeling_diffusion import DiffusionPolicy
 
-        # 1. Load policy and select device
         self.diffusion_Start = True
         device = "cuda" if torch.cuda.is_available() else "cpu"
         policy = DiffusionPolicy.from_pretrained(policy_path)
@@ -111,7 +104,6 @@ class Ros2Robot(Node):
 
         step = 0
         while step < max_steps and self.is_connected:
-            # 2. Capture observation from ROS
             if not (self.state_hand_poses and self.left_color is not None and self.right_color is not None):
                 continue
 
@@ -138,6 +130,7 @@ class Ros2Robot(Node):
         self.get_logger().info("Diffusion policy run complete or robot disconnected.")
         time.sleep(1)
         self.disconnect()
+
     def _state_hand_poses_callback(self, msg: Float32MultiArray):
         """
         Callback invoked when a new JointState message arrives.
@@ -153,6 +146,10 @@ class Ros2Robot(Node):
         self.connect_event.set()
 
     def _command_callback(self, msg: String):
+        '''
+        Callback for the /lerobot/command topic.
+        Switches from no policy to diffusion policy.
+        '''
         self.command = msg
         if self.diffusion_Start:
             return
@@ -172,7 +169,7 @@ class Ros2Robot(Node):
         Converts the ROS Image message to an OpenCV image and stores it.
         """
         cv_img = self._bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-        # print("Got left color")
+        print("Got left color")
         self.left_color = cv_img
     def _right_color_callback(self, msg: Image):
         """
@@ -180,7 +177,7 @@ class Ros2Robot(Node):
         Converts the ROS Image message to an OpenCV image and stores it.
         """
         cv_img = self._bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-        # print("Got right color")
+        print("Got right color")
         self.right_color = cv_img
 
     def _status_callback(self, msg: String):
