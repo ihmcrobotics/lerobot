@@ -52,7 +52,7 @@ class Ros2Robot(Node):
         Logs connection status to the ROS2 console.
         """
         self.get_logger().info('Waiting for /lerobot/connect to connect...')
-        # self.connect_event.wait()  # Blocks here until _connect_callback sets the event
+        self.connect_event.wait()  # Blocks here until _connect_callback sets the event
         self.is_connected = True
         self.get_logger().info('Connected.')
     def send_action(self, action: torch.Tensor):
@@ -79,11 +79,9 @@ class Ros2Robot(Node):
             status = String()
             status.data = "True"
             self.lerobot_status_pub.publish(status)
-            rclpy.spin_once(self, timeout_sec=0.05)
         status = String()
         status.data = "False"
         self.lerobot_status_pub.publish(status)
-        rclpy.spin_once(self, timeout_sec=0.05)
     def run_diffusion_policy(self, max_steps=100, policy_path=Path("outputs/train/pretrained_model")):
         """
         Runs the diffusion policy on the real robot through ROS2 topics,
@@ -143,14 +141,17 @@ class Ros2Robot(Node):
         Callback for the /lerobot/connect topic.
         Triggers the connection process when a message is received.
         """
-        self.connect_event.set()
+        if msg.data == "connect":
+            self.connect_event.set()
 
     def _command_callback(self, msg: String):
-        '''
+        """
         Callback for the /lerobot/command topic.
         Switches from no policy to diffusion policy.
-        '''
+        """
         self.command = msg
+        if not self.is_connected:
+            return
         if self.diffusion_Start:
             return
         if self.command.data == '':
@@ -168,16 +169,22 @@ class Ros2Robot(Node):
         Callback invoked when a new Image message arrives.
         Converts the ROS Image message to an OpenCV image and stores it.
         """
+        if not self.diffusion_Start:
+            return
         cv_img = self._bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-        print("Got left color")
+        if self.left_color is None:
+            print("Got left color")
         self.left_color = cv_img
     def _right_color_callback(self, msg: Image):
         """
         Callback invoked when a new Image message arrives.
         Converts the ROS Image message to an OpenCV image and stores it.
         """
+        if not self.diffusion_Start:
+            return
         cv_img = self._bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-        print("Got right color")
+        if self.right_color is None:
+            print("Got right color")
         self.right_color = cv_img
 
     def _status_callback(self, msg: String):
@@ -225,9 +232,8 @@ def main():
     robot = Ros2Robot(config)
     spin_thread = threading.Thread(target=rclpy.spin, args=(robot,))
     spin_thread.start()
-    status_thread = threading.Thread(target=robot.status_thread, args=())
     robot.connect()
-    status_thread.start()
+
 
 
 
