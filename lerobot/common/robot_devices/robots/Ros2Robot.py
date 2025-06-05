@@ -13,6 +13,7 @@ from pathlib import Path
 from lerobot.common.robot_devices.robots.configs import Ros2RobotConfig
 from lerobot.common.policies.diffusion.modeling_diffusion import DiffusionPolicy
 
+
 class Ros2Robot(Node):
     def __init__(self, config: Ros2RobotConfig):
         """
@@ -29,11 +30,10 @@ class Ros2Robot(Node):
         self._bridge = None
         for topic, (msg_type, cb_name, qos) in config.subscribers.items():
             callback = getattr(self, cb_name)
-            attr = topic.strip('/').replace('/','_') + '_sub'
+            attr = topic.strip('/').replace('/', '_') + '_sub'
             setattr(self, attr, self.create_subscription(msg_type, topic, callback, qos))
             if msg_type is Image and self._bridge is None:
                 self._bridge = CvBridge()
-
 
         # Initialize state variables
         self.command = ""
@@ -55,6 +55,7 @@ class Ros2Robot(Node):
         self.connect_event.wait()  # Blocks here until _connect_callback sets the event
         self.is_connected = True
         self.get_logger().info('Connected.')
+
     def send_action(self, action: torch.Tensor):
         """
         Publish the provided action tensor to the robot.
@@ -68,20 +69,10 @@ class Ros2Robot(Node):
         arr = action.detach().cpu().numpy().astype(np.float32)
         msg = Float32MultiArray(data=arr.flatten().tolist())
         self.lerobot_lerobot_action_hand_poses_pub.publish(msg)
+        time.sleep(0.25)
 
         self._count += 1
 
-    def status_thread(self):
-        """
-        Thread for sending status through ROS.
-        """
-        while self.is_connected:
-            status = String()
-            status.data = "True"
-            self.lerobot_status_pub.publish(status)
-        status = String()
-        status.data = "False"
-        self.lerobot_status_pub.publish(status)
     def run_diffusion_policy(self, max_steps=100, policy_path=Path("outputs/train/pretrained_model")):
         """
         Runs the diffusion policy on the real robot through ROS2 topics,
@@ -175,6 +166,7 @@ class Ros2Robot(Node):
         if self.left_color is None:
             print("Got left color")
         self.left_color = cv_img
+
     def _right_color_callback(self, msg: Image):
         """
         Callback invoked when a new Image message arrives.
@@ -224,6 +216,7 @@ class Ros2Robot(Node):
         self.destroy_node()
         rclpy.shutdown()
 
+
 def main():
     import os
     os.environ['ROS_DOMAIN_ID'] = '185'
@@ -233,8 +226,6 @@ def main():
     spin_thread = threading.Thread(target=rclpy.spin, args=(robot,))
     spin_thread.start()
     robot.connect()
-
-
 
 
 if __name__ == '__main__':
