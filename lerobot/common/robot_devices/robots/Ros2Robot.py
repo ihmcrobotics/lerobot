@@ -1,4 +1,6 @@
 import time
+from copy import copy
+
 import rclpy
 from rclpy.node import Node
 import torch
@@ -12,6 +14,7 @@ from typing import Optional, Tuple, List
 from pathlib import Path
 from lerobot.common.robot_devices.robots.configs import Ros2RobotConfig
 from lerobot.common.policies.diffusion.modeling_diffusion import DiffusionPolicy
+from lerobot.common.utils.utils import get_safe_torch_device
 
 
 class Ros2Robot(Node):
@@ -97,9 +100,9 @@ class Ros2Robot(Node):
                 continue
 
             state_hand_poses, left_color, right_color = self.capture_observation()
-            state = torch.tensor(state_hand_poses, dtype=torch.float32, device=device).unsqueeze(0)
-            img_tensor_left = torch.tensor(left_color, dtype=torch.float32, device=device).unsqueeze(0) / 255.0
-            img_tensor_right = torch.tensor(right_color, dtype=torch.float32, device=device).unsqueeze(0) / 255.0
+            state = torch.tensor(state_hand_poses, dtype=torch.float32, device=device)
+            img_tensor_left = torch.tensor(left_color, dtype=torch.float32, device=device)
+            img_tensor_right = torch.tensor(right_color, dtype=torch.float32, device=device)
 
             obs = {
                 "observation.state": state,
@@ -107,9 +110,7 @@ class Ros2Robot(Node):
                 "observation.images.cam_zed_right": img_tensor_right,
             }
 
-            with torch.no_grad():
-                action = policy.select_action(obs)
-            action = action.squeeze(0)
+            action = predict_action(obs, policy, get_safe_torch_device(policy.config.device), True)
 
             self.send_action(action)
 
@@ -216,10 +217,25 @@ class Ros2Robot(Node):
         self.destroy_node()
         rclpy.shutdown()
 
+def predict_action(observation, policy, device, use_amp):
+    observation = copy(observation)
+    with (
+        torch.inference_mode(), torch.autocast(device_type=device.type) if device.type == "cuda" and use_amp else nullcontext(),
+    ):
+        for name in observation:
+            if "image" in name:
+                observation[name] = observation[name].type(torch.float32) / 255
+            observation[name] = observation[name].unsqueeze(0)
+            observation[name] = observation[name].to(device)
+        start = time.perf_counter()
+        action = policy.select_action(observation)
+        elapsed = time.perf_counter() - start
+        print(f"select action took {elapsed:.3f} seconds")
+        action = action.squeeze(0)
+        action = action.to("cpu")
+    return action
 
 def main():
-    import os
-    os.environ['ROS_DOMAIN_ID'] = '185'
     rclpy.init()
     config = Ros2RobotConfig()
     robot = Ros2Robot(config)
