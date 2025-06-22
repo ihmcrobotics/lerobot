@@ -875,10 +875,10 @@ class LeRobotDataset(torch.utils.data.Dataset):
         self._save_episode_table(episode_buffer, episode_index)
         ep_stats = compute_episode_stats(episode_buffer, self.features)
 
-        if len(self.meta.video_keys) > 0:
-            video_paths = self.encode_episode_videos(episode_index)
-            for key in self.meta.video_keys:
-                episode_buffer[key] = video_paths[key]
+        # if len(self.meta.video_keys) > 0:
+        #     video_paths = self.encode_episode_videos(episode_index)
+        #     for key in self.meta.video_keys:
+        #         episode_buffer[key] = video_paths[key]
 
         # `meta.save_episode` be executed after encoding the videos
         self.meta.save_episode(episode_index, episode_length, episode_tasks, ep_stats)
@@ -899,10 +899,10 @@ class LeRobotDataset(torch.utils.data.Dataset):
         parquet_files = list(self.root.rglob("*.parquet"))
         assert len(parquet_files) == self.num_episodes
 
-        # delete images
-        img_dir = self.root / "images"
-        if img_dir.is_dir():
-            shutil.rmtree(self.root / "images")
+        # Comment out image deletion to preserve images
+        # img_dir = self.root / "images"
+        # if img_dir.is_dir():
+        #     shutil.rmtree(self.root / "images")
 
         if not episode_data:  # Reset the buffer
             self.episode_buffer = self.create_episode_buffer()
