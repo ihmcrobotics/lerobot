@@ -12,7 +12,7 @@ from sensor_msgs.msg import JointState, Image
 from cv_bridge import CvBridge
 from typing import Optional, Tuple, List
 from pathlib import Path
-from lerobot.common.robot_devices.robots.configs import Ros2RobotConfig
+from config_ihmc_ros_robot import Ros2RobotConfig
 from lerobot.common.policies.diffusion.modeling_diffusion import DiffusionPolicy
 from lerobot.common.utils.utils import get_safe_torch_device
 
