@@ -1,11 +1,11 @@
 from dataclasses import dataclass, field
-from lerobot.common.robots.config import RobotConfig
+from lerobot.robots.config import RobotConfig
 
 
 from sensor_msgs.msg import JointState, Image
 from std_msgs.msg import Float32MultiArray, String
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy
-@RobotConfig.register_subclass("ros2robot")
+@RobotConfig.register_subclass("ihmc_ros_robot")
 @dataclass
 class Ros2RobotConfig(RobotConfig):
     subscribers: dict[str, tuple[type, str, QoSProfile]] = field(

@@ -1,20 +1,24 @@
 import time
 from copy import copy
 
+import threading
+import time
+from copy import copy
+
 import rclpy
 from rclpy.node import Node
+from rclpy.executors import MultiThreadedExecutor
 import torch
 import numpy as np
-import threading
 
 from std_msgs.msg import Float32MultiArray, String
 from sensor_msgs.msg import JointState, Image
 from cv_bridge import CvBridge
 from typing import Optional, Tuple, List
 from pathlib import Path
-from config_ihmc_ros_robot import Ros2RobotConfig
-from lerobot.common.policies.diffusion.modeling_diffusion import DiffusionPolicy
-from lerobot.common.utils.utils import get_safe_torch_device
+from lerobot.robots.ihmc_ros_robot.config_ihmc_ros_robot import Ros2RobotConfig
+from lerobot.policies.diffusion.modeling_diffusion import DiffusionPolicy
+from lerobot.utils.utils import get_safe_torch_device
 
 
 class Ros2Robot(Node):
@@ -24,7 +28,7 @@ class Ros2Robot(Node):
         Sets up publishers for actions, subscribers for joint states and images,
         and state variables to track the latest observations.
         """
-        super().__init__('ros2robot')
+        super().__init__('ihmc_ros_robot')
         self.config = config
 
         for topic, (msg_type, qos) in config.publishers.items():
@@ -76,7 +80,7 @@ class Ros2Robot(Node):
 
         self._count += 1
 
-    def run_diffusion_policy(self, max_steps=100, policy_path=Path("outputs/train/pretrained_model")):
+    def run_diffusion_policy(self, max_steps=100, policy_path=Path("/home/bpratt/ws_alex/repository-group/lerobot/outputs/train/pretrained_model")):
         """
         Runs the diffusion policy on the real robot through ROS2 topics,
 
@@ -87,7 +91,10 @@ class Ros2Robot(Node):
 
         self.diffusion_Start = True
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        policy = DiffusionPolicy.from_pretrained(policy_path)
+        policy = DiffusionPolicy.from_pretrained(
+            str(policy_path),
+            local_files_only=True
+        )
         policy.to(device)
         policy.reset()
         policy.eval()
@@ -164,8 +171,7 @@ class Ros2Robot(Node):
         if not self.diffusion_Start:
             return
         cv_img = self._bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-        if self.left_color is None:
-            print("Got left color")
+        print("Got left color")
         self.left_color = cv_img
 
     def _right_color_callback(self, msg: Image):
@@ -176,8 +182,7 @@ class Ros2Robot(Node):
         if not self.diffusion_Start:
             return
         cv_img = self._bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-        if self.right_color is None:
-            print("Got right color")
+        print("Got right color")
         self.right_color = cv_img
 
     def _status_callback(self, msg: String):
@@ -239,9 +244,22 @@ def main():
     rclpy.init()
     config = Ros2RobotConfig()
     robot = Ros2Robot(config)
-    spin_thread = threading.Thread(target=rclpy.spin, args=(robot,))
+
+    # Create a MultiThreadedExecutor with 4 threads
+    executor = MultiThreadedExecutor(num_threads=4)
+
+    # Add our node to it
+    executor.add_node(robot)
+
+    # Start spinning in a background thread so callbacks fire concurrently
+    spin_thread = threading.Thread(target=executor.spin, daemon=True)
     spin_thread.start()
+
+    # Block here until we receive the “connect” message
     robot.connect()
+
+    # Once robot.disconnect() calls rclpy.shutdown(), executor.spin() will return
+    spin_thread.join()
 
 
 if __name__ == '__main__':
