@@ -10,13 +10,13 @@ from rclpy.qos import QoSProfile, QoSReliabilityPolicy
 class Ros2RobotConfig(RobotConfig):
     subscribers: dict[str, tuple[type, str, QoSProfile]] = field(
         default_factory=lambda: {
-            '/lerobot/zed/left/color': (
+            '/zed/color/left/image': (
                 Image, '_left_color_callback',
-                QoSProfile(depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)
+                QoSProfile(depth=1, reliability=QoSReliabilityPolicy.RELIABLE)
             ),
-            '/lerobot/zed/right/color': (
+            '/zed/color/right/image': (
                 Image, '_right_color_callback',
-                QoSProfile(depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)
+                QoSProfile(depth=1, reliability=QoSReliabilityPolicy.RELIABLE)
             ),
             '/lerobot/lerobot/state/hand_poses': (
                 Float32MultiArray, '_state_hand_poses_callback',
