@@ -80,7 +80,7 @@ class Ros2Robot(Node):
 
         self._count += 1
 
-    def run_diffusion_policy(self, max_steps=100, policy_path=Path("/home/bpratt/ws_alex/repository-group/lerobot/outputs/train/pretrained_model")):
+    def run_diffusion_policy(self, max_steps=100, policy_path=Path("H2Ozone/Circles2")):
         """
         Runs the diffusion policy on the real robot through ROS2 topics,
 
@@ -92,8 +92,7 @@ class Ros2Robot(Node):
         self.diffusion_Start = True
         device = "cuda" if torch.cuda.is_available() else "cpu"
         policy = DiffusionPolicy.from_pretrained(
-            str(policy_path),
-            local_files_only=True
+            str(policy_path)
         )
         policy.to(device)
         policy.reset()

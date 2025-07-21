@@ -12,11 +12,11 @@ class Ros2RobotConfig(RobotConfig):
         default_factory=lambda: {
             '/zed/color/left/image': (
                 Image, '_left_color_callback',
-                QoSProfile(depth=1, reliability=QoSReliabilityPolicy.RELIABLE)
+                QoSProfile(depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)
             ),
             '/zed/color/right/image': (
                 Image, '_right_color_callback',
-                QoSProfile(depth=1, reliability=QoSReliabilityPolicy.RELIABLE)
+                QoSProfile(depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)
             ),
             '/lerobot/lerobot/state/hand_poses': (
                 Float32MultiArray, '_state_hand_poses_callback',
