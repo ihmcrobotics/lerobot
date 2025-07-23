@@ -1,6 +1,5 @@
-import time
-from copy import copy
 
+import argparse
 import threading
 import time
 from copy import copy
@@ -10,6 +9,8 @@ from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
 import torch
 import numpy as np
+
+from contextlib import nullcontext
 
 from std_msgs.msg import Float32MultiArray, String
 from sensor_msgs.msg import JointState, Image
@@ -240,7 +241,19 @@ def predict_action(observation, policy, device, use_amp):
     return action
 
 def main():
-    rclpy.init()
+    #TODO: Figure out way to look at IHMCNetwork to set the domain id correctly
+    parser = argparse.ArgumentParser(description="Launch the IHMC ROS2 robot node")
+    parser.add_argument(
+        "--ros_domain_id",
+        type=int,
+        default=44,
+        help="ROS 2 domain ID to use when initializing (default: 44)"
+    )
+    args = parser.parse_args()
+
+    rclpy.init(args=None, domain_id=args.ros_domain_id)
+    ctx = rclpy.get_default_context()
+    print(f"ROS domain ID is: {ctx.get_domain_id()}")
     config = Ros2RobotConfig()
     robot = Ros2Robot(config)
 
