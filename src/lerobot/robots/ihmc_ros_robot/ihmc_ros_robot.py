@@ -64,7 +64,7 @@ class Ros2Robot(Node):
         #TODO: Get rid of sleep for a throttler or something of the sort
         time.sleep(0.25)
 
-    def run_diffusion_policy(self, max_steps=100, policy_path=Path("H2Ozone/Circles2")):
+    def run_diffusion_policy(self, max_steps=10, policy_path=Path("H2Ozone/Circles2")):
         """
         Runs the diffusion policy on the real robot through ROS2 topics,
 
@@ -110,6 +110,7 @@ class Ros2Robot(Node):
         self.get_logger().info("Diffusion policy run complete or robot disconnected.")
         time.sleep(1)
         self.disconnect()
+        time.sleep(1)
 
     def _state_hand_poses_callback(self, msg: Float32MultiArray):
         """
@@ -189,6 +190,7 @@ class Ros2Robot(Node):
         self.lerobot_status_pub.publish(status)
         time.sleep(2)
         self.destroy_node()
+        time.sleep(1)
         rclpy.shutdown()
 
 def predict_action(observation, policy, device, use_amp):
