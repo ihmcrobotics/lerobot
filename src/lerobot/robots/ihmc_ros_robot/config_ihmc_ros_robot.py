@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from lerobot.robots.config import RobotConfig
 
 
-from sensor_msgs.msg import JointState, Image
+from sensor_msgs.msg import Image
 from std_msgs.msg import Float32MultiArray, String
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy
 @RobotConfig.register_subclass("ihmc_ros_robot")
@@ -20,10 +20,6 @@ class Ros2RobotConfig(RobotConfig):
             ),
             '/lerobot/lerobot/state/hand_poses': (
                 Float32MultiArray, '_state_hand_poses_callback',
-                QoSProfile(depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)
-            ),
-            '/lerobot/connect': (
-                String, '_connect_callback',
                 QoSProfile(depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT)
             ),
             '/lerobot/command': (

@@ -13,7 +13,7 @@ import numpy as np
 from contextlib import nullcontext
 
 from std_msgs.msg import Float32MultiArray, String
-from sensor_msgs.msg import JointState, Image
+from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 from typing import Optional, Tuple, List
 from pathlib import Path
@@ -45,24 +45,11 @@ class Ros2Robot(Node):
 
         # Initialize state variables
         self.command = ""
-        self.connect_event = threading.Event()
         self.policy_status = ""
         self.state_hand_poses = None
         self.right_color = None
         self.left_color = None
-        self._count = 0
-        self.is_connected = False
         self.diffusion_Start = False
-
-    def connect(self):
-        """
-        Mark the robot as connected and enable sending actions.
-        Logs connection status to the ROS2 console.
-        """
-        self.get_logger().info('Waiting for /lerobot/connect to connect...')
-        self.connect_event.wait()  # Blocks here until _connect_callback sets the event
-        self.is_connected = True
-        self.get_logger().info('Connected.')
 
     def send_action(self, action: torch.Tensor):
         """
@@ -70,16 +57,12 @@ class Ros2Robot(Node):
         If not connected, logs a warning and drops the message.
         Converts the tensor to a Float32MultiArray message before publishing.
         """
-        if not self.is_connected:
-            self.get_logger().warning('Not connected: dropping action')
-            return
         # Convert action tensor to numpy and then to ROS message
         arr = action.detach().cpu().numpy().astype(np.float32)
         msg = Float32MultiArray(data=arr.flatten().tolist())
         self.lerobot_lerobot_action_hand_poses_pub.publish(msg)
+        #TODO: Get rid of sleep for a throttler or something of the sort
         time.sleep(0.25)
-
-        self._count += 1
 
     def run_diffusion_policy(self, max_steps=100, policy_path=Path("H2Ozone/Circles2")):
         """
@@ -102,7 +85,7 @@ class Ros2Robot(Node):
         self.get_logger().info(f"Running diffusion policy for up to {max_steps} steps...")
 
         step = 0
-        while step < max_steps and self.is_connected:
+        while step < max_steps:
             if not (self.state_hand_poses and self.left_color is not None and self.right_color is not None):
                 continue
 
@@ -135,22 +118,12 @@ class Ros2Robot(Node):
         """
         self.state_hand_poses = msg
 
-    def _connect_callback(self, msg: String):
-        """
-        Callback for the /lerobot/connect topic.
-        Triggers the connection process when a message is received.
-        """
-        if msg.data == "connect":
-            self.connect_event.set()
-
     def _command_callback(self, msg: String):
         """
         Callback for the /lerobot/command topic.
         Switches from no policy to diffusion policy.
         """
         self.command = msg
-        if not self.is_connected:
-            return
         if self.diffusion_Start:
             return
         if self.command.data == '':
@@ -161,7 +134,6 @@ class Ros2Robot(Node):
             threading.Thread(target=self.run_diffusion_policy, daemon=True).start()
         else:
             self.get_logger().info(f'Command callback is: {msg.data}')
-            self.connect_event.set()
 
     def _left_color_callback(self, msg: Image):
         """
@@ -171,7 +143,6 @@ class Ros2Robot(Node):
         if not self.diffusion_Start:
             return
         cv_img = self._bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-        print("Got left color")
         self.left_color = cv_img
 
     def _right_color_callback(self, msg: Image):
@@ -182,7 +153,6 @@ class Ros2Robot(Node):
         if not self.diffusion_Start:
             return
         cv_img = self._bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-        print("Got right color")
         self.right_color = cv_img
 
     def _status_callback(self, msg: String):
@@ -214,7 +184,6 @@ class Ros2Robot(Node):
         Logs the shutdown and destroys the node.
         """
         self.get_logger().info('Shutting down...')
-        self.is_connected = False
         status = String()
         status.data = "False"
         self.lerobot_status_pub.publish(status)
@@ -232,10 +201,7 @@ def predict_action(observation, policy, device, use_amp):
                 observation[name] = observation[name].type(torch.float32) / 255
             observation[name] = observation[name].unsqueeze(0)
             observation[name] = observation[name].to(device)
-        start = time.perf_counter()
         action = policy.select_action(observation)
-        elapsed = time.perf_counter() - start
-        print(f"select action took {elapsed:.3f} seconds")
         action = action.squeeze(0)
         action = action.to("cpu")
     return action
@@ -253,9 +219,10 @@ def main():
 
     rclpy.init(args=None, domain_id=args.ros_domain_id)
     ctx = rclpy.get_default_context()
-    print(f"ROS domain ID is: {ctx.get_domain_id()}")
+
     config = Ros2RobotConfig()
     robot = Ros2Robot(config)
+    robot.get_logger().info(f"ROS domain ID is: {ctx.get_domain_id()}")
 
     # Create a MultiThreadedExecutor with 4 threads
     executor = MultiThreadedExecutor(num_threads=4)
@@ -266,9 +233,6 @@ def main():
     # Start spinning in a background thread so callbacks fire concurrently
     spin_thread = threading.Thread(target=executor.spin, daemon=True)
     spin_thread.start()
-
-    # Block here until we receive the “connect” message
-    robot.connect()
 
     # Once robot.disconnect() calls rclpy.shutdown(), executor.spin() will return
     spin_thread.join()
