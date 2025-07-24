@@ -45,6 +45,7 @@ class Ros2Robot(Node):
         # Initialize state variables
         self.command = ""
         self.policyStatus = ""
+        self.policy = None
         self.pythonStatus = ""
         self.stateHandPoses = None
         self.zedRightColor = None
@@ -64,7 +65,7 @@ class Ros2Robot(Node):
         self.lerobot_lerobot_action_hand_poses_pub.publish(msg)
         # TODO: Get rid of sleep for a throttler or something of the sort
 
-    def run_diffusion_policy(self, max_steps=100, policy_path=Path("/home/bpratt/ws_alex/repository-group/lerobot/outputs/train/pretrained_model")):
+    def run_diffusion_policy(self, max_steps=2000):
         """
         Runs the diffusion policy on the real robot through ROS2 topics,
 
@@ -75,14 +76,12 @@ class Ros2Robot(Node):
 
         self.diffusionStart = True
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        policy = DiffusionPolicy.from_pretrained(
-            str(policy_path), local_files_only=True, cache_dir="~/.cache/huggingface"
-        )
         self.pythonStatus = "Diffusion"
 
-        policy.to(device)
-        policy.reset()
-        policy.eval()
+        if self.policy is not None:
+            self.policy.to(device)
+            self.policy.reset()
+            self.policy.eval()
 
         self.get_logger().info(f"Running diffusion policy for up to {max_steps} steps...")
 
@@ -103,7 +102,7 @@ class Ros2Robot(Node):
                 "observation.images.cam_zed_right": img_tensor_right,
             }
 
-            action = predict_action(obs, policy, get_safe_torch_device(policy.config.device), True)
+            action = predict_action(obs, self.policy, get_safe_torch_device(self.policy.config.device), True)
 
             self.send_action(action)
 
@@ -244,6 +243,10 @@ def main():
     executor.add_node(robot)
 
     # Start spinning in a background thread so callbacks fire concurrently
+    policy_path = Path("/home/bpratt/ws_alex/repository-group/lerobot/outputs/train/pretrained_model")
+    robot.policy = DiffusionPolicy.from_pretrained(
+        str(policy_path), local_files_only=True, cache_dir="~/.cache/huggingface", revision="fp16"
+    )
     spin_thread = threading.Thread(target=executor.spin, daemon=True)
     spin_thread.start()
 
