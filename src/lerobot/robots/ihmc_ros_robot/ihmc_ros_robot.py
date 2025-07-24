@@ -45,6 +45,7 @@ class Ros2Robot(Node):
         # Initialize state variables
         self.command = ""
         self.policyStatus = ""
+        self.pythonStatus = ""
         self.stateHandPoses = None
         self.zedRightColor = None
         self.zedLeftColor = None
@@ -62,9 +63,8 @@ class Ros2Robot(Node):
         msg = Float32MultiArray(data=arr.flatten().tolist())
         self.lerobot_lerobot_action_hand_poses_pub.publish(msg)
         # TODO: Get rid of sleep for a throttler or something of the sort
-        time.sleep(0.25)
 
-    def run_diffusion_policy(self, max_steps=100, policy_path=Path("H2Ozone/Circles2")):
+    def run_diffusion_policy(self, max_steps=100, policy_path=Path("/home/bpratt/ws_alex/repository-group/lerobot/outputs/train/pretrained_model")):
         """
         Runs the diffusion policy on the real robot through ROS2 topics,
 
@@ -76,8 +76,10 @@ class Ros2Robot(Node):
         self.diffusionStart = True
         device = "cuda" if torch.cuda.is_available() else "cpu"
         policy = DiffusionPolicy.from_pretrained(
-            str(policy_path)
+            str(policy_path), local_files_only=True, cache_dir="~/.cache/huggingface"
         )
+        self.pythonStatus = "Diffusion"
+
         policy.to(device)
         policy.reset()
         policy.eval()
@@ -88,7 +90,8 @@ class Ros2Robot(Node):
         while step < max_steps:
             if not (self.stateHandPoses and self.zedLeftColor is not None and self.zedRightColor is not None):
                 continue
-
+            msg = String(data=self.pythonStatus)
+            self.lerobot_status_pub.publish(msg)
             state_hand_poses, left_color, right_color = self.capture_observation()
             state = torch.tensor(state_hand_poses, dtype=torch.float32, device=device)
             img_tensor_left = torch.tensor(left_color, dtype=torch.float32, device=device)
@@ -109,6 +112,9 @@ class Ros2Robot(Node):
 
         self.get_logger().info("Diffusion policy run complete or robot disconnected.")
         time.sleep(1)
+        self.pythonStatus = "Done"
+        msg = String(data=self.pythonStatus)
+        self.lerobot_status_pub.publish(msg)
         self.disconnect()
         time.sleep(1)
 
