@@ -592,6 +592,10 @@ class DiffusionConditionalUnet1d(nn.Module):
         super().__init__()
 
         self.config = config
+        self.config.horizon = 64
+        self.config.n_action_steps = 32
+
+        self.config.num_inference_steps = 20
 
         # Encoder for the diffusion timestep.
         self.diffusion_step_encoder = nn.Sequential(
