@@ -64,6 +64,7 @@ class Ros2Robot(Node):
         msg = Float32MultiArray(data=arr.flatten().tolist())
         self.lerobot_lerobot_action_hand_poses_pub.publish(msg)
         # TODO: Get rid of sleep for a throttler or something of the sort
+        time.sleep(0.05)
 
     def run_diffusion_policy(self, max_steps=2000):
         """
