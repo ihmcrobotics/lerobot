@@ -105,6 +105,10 @@ class Ros2Robot(Node):
             action = predict_action(obs, self.policy, get_safe_torch_device(self.policy.config.device), True)
 
             self.send_action(action)
+            if(step <= 10):
+                self.pythonStatus = "Start"
+            else:
+                self.pythonStatus = "Diffusion"
 
             self.get_logger().info(f'Published action #{step}')
             step += 1
