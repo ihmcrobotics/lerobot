@@ -46,5 +46,5 @@ class Ros2RobotConfig(RobotConfig):
             "/lerobot/status": (String, 10),
         }
     )
-    control_frequency: float = 1.0  # Hz
+    control_frequency: float = 50.0  # Hz
     mock: bool = False
