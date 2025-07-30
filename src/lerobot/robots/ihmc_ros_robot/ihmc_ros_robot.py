@@ -227,6 +227,13 @@ def main() -> None:
         default=44,
         help="ROS 2 domain ID (default: 44)",
     )
+
+    parser.add_argument(
+        "--trained_policy",
+        type=str,
+        default="H2Ozone/Circles2",
+        help="Path to trained policy file (default: H2Ozone/Circles2)"
+    )
     args = parser.parse_args()
 
     rclpy.init(args=None, domain_id=args.ros_domain_id)
@@ -234,12 +241,14 @@ def main() -> None:
 
     config = Ros2RobotConfig()
     robot = Ros2Robot(config)
-    robot.get_logger().info(f"ROS domain ID: {context.get_domain_id()}")
+    robot.get_logger().info(f"ROS domain ID: {context.get_domain_id()} \nLoading trained policy file: {args.trained_policy}")
 
-    policy_path = "H2Ozone/Circles2"
+    policy_path = args.trained_policy
     robot.policy = DiffusionPolicy.from_pretrained(
         str(policy_path),
+        local_files_only=False,
     )
+    robot.get_logger().info("Loaded policy.")
 
     executor = MultiThreadedExecutor(num_threads=4)
     executor.add_node(robot)
