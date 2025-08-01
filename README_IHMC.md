@@ -17,9 +17,9 @@ tmux attach -t lerobot
 
 1. Install [miniconda](https://www.anaconda.com/docs/getting-started/miniconda/main).
 ```
-$curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-$chmod +x Miniconda3-latest-*.sh
-$./Miniconda3-latest-*.sh
+$ curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+$ chmod +x Miniconda3-latest-*.sh
+$ ./Miniconda3-latest-*.sh
 ```
 ```
 conda init
@@ -34,6 +34,11 @@ conda install mamba -c conda-forge
 I needed to make sure this was setup (and restart shell after):
 ```
 $ mamba shell init --shell bash --root-prefix=~/.local/share/mamba
+```
+
+For some reason on Arch Linux I needed to do this:
+```
+# chown -R duncan:duncan /opt/miniconda3/
 ```
 
 1. Install ROS 2 via [Robostack](https://robostack.github.io/GettingStarted.html).
