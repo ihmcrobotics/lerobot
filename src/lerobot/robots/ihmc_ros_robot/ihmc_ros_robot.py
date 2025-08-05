@@ -102,7 +102,7 @@ class Ros2Robot(Node):
         """
         arr = action.detach().cpu().numpy().astype(np.float32).flatten().tolist()
         msg = Float32MultiArray(data=arr)
-        self.lerobot_lerobot_action_hand_poses_pub.publish(msg)
+        self.lerobot_lerobot_action_pub.publish(msg)
 
     def run_diffusion_policy(self, max_steps: int = 2000) -> None:
         """

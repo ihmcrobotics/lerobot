@@ -23,7 +23,7 @@ class Ros2RobotConfig(RobotConfig):
                 "right_color_callback",
                 QoSProfile(depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT),
             ),
-            "/lerobot/lerobot/state/hand_poses": (
+            "/lerobot/lerobot/state": (
                 Float32MultiArray,
                 "state_hand_poses_callback",
                 QoSProfile(depth=10, reliability=QoSReliabilityPolicy.BEST_EFFORT),
@@ -42,7 +42,7 @@ class Ros2RobotConfig(RobotConfig):
     )
     publishers: Dict[str, Tuple[Type, int]] = field(
         default_factory=lambda: {
-            "/lerobot/lerobot/action/hand_poses": (Float32MultiArray, 10),
+            "/lerobot/lerobot/action": (Float32MultiArray, 10),
             "/lerobot/status": (String, 10),
         }
     )
