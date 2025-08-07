@@ -122,35 +122,130 @@ def _assert_type_and_shape(stats_list: list[dict[str, dict]]):
                 if "image" in fkey and k != "count" and v.shape != (3, 1, 1):
                     raise ValueError(f"Shape of '{k}' must be (3,1,1), but is {v.shape} instead.")
 
+def aggregate_feature_stats(stats_ft_list):
+    """
+    Combine per-episode stats for a single feature.
 
-def aggregate_feature_stats(stats_ft_list: list[dict[str, dict]]) -> dict[str, dict[str, np.ndarray]]:
-    """Aggregates stats for a single feature."""
-    means = np.stack([s["mean"] for s in stats_ft_list])
-    variances = np.stack([s["std"] ** 2 for s in stats_ft_list])
-    counts = np.stack([s["count"] for s in stats_ft_list])
-    total_count = counts.sum(axis=0)
+    Each element of stats_ft_list must be a dict with:
+      - 'mean': array-like
+      - 'std':  array-like
+      - 'count' or 'n': int
+    Optional:
+      - 'min':  array-like
+      - 'max':  array-like
 
-    # Prepare weighted mean by matching number of dimensions
-    while counts.ndim < means.ndim:
-        counts = np.expand_dims(counts, axis=-1)
+    Returns:
+      {
+        'mean':  (D,) float64
+        'std':   (D,) float64
+        'count': int
+        # 'min': (D,) float64  (if present in any input)
+        # 'max': (D,) float64  (if present in any input)
+      }
+    """
+    def _norm(x, name, idx):
+        try:
+            arr = np.asarray(x, dtype=np.float64)
+        except Exception as e:
+            raise TypeError(f"{name} at idx {idx} could not be converted to float64: {e}")
+        arr = np.squeeze(arr)
+        if arr.ndim == 0:
+            arr = arr[None]
+        return arr
 
-    # Compute the weighted mean
-    weighted_means = means * counts
-    total_mean = weighted_means.sum(axis=0) / total_count
+    means, vars_, counts = [], [], []
+    mins, maxs = [], []
+    have_min = False
+    have_max = False
 
-    # Compute the variance using the parallel algorithm
-    delta_means = means - total_mean
-    weighted_variances = (variances + delta_means**2) * counts
-    total_variance = weighted_variances.sum(axis=0) / total_count
+    for i, s in enumerate(stats_ft_list):
+        if s is None:
+            continue
 
-    return {
-        "min": np.min(np.stack([s["min"] for s in stats_ft_list]), axis=0),
-        "max": np.max(np.stack([s["max"] for s in stats_ft_list]), axis=0),
-        "mean": total_mean,
-        "std": np.sqrt(total_variance),
-        "count": total_count,
+        if "mean" not in s or ("std" not in s):
+            raise KeyError(f"Missing 'mean' or 'std' at idx {i}: keys={list(s.keys())}")
+
+        m  = _norm(s["mean"], "mean", i)
+        sd = _norm(s["std"],  "std",  i)
+
+        # count key tolerance
+        n = s.get("count", s.get("n", None))
+        if n is None:
+            raise KeyError(f"Missing 'count' (or 'n') at idx {i}")
+        try:
+            n = int(n)
+        except Exception:
+            raise TypeError(f"'count' must be int-like at idx {i}, got {type(n)}: {n}")
+
+        if m.shape != sd.shape:
+            raise ValueError(f"mean/std shape mismatch at idx {i}: {m.shape} vs {sd.shape}")
+
+        means.append(m)
+        vars_.append(sd ** 2)
+        counts.append(n)
+
+        if "min" in s and s["min"] is not None:
+            mins.append(_norm(s["min"], "min", i))
+            have_min = True
+        if "max" in s and s["max"] is not None:
+            maxs.append(_norm(s["max"], "max", i))
+            have_max = True
+
+    if not means:
+        raise ValueError("No valid stats provided.")
+
+    # Ensure all episodes have the same feature dimension
+    shapes = {tuple(x.shape) for x in means}
+    if len(shapes) != 1:
+        raise ValueError(f"Inconsistent feature shapes across episodes: {shapes}. Fix upstream.")
+
+    means = np.stack(means)        # (E, D)
+    vars_ = np.stack(vars_)        # (E, D)
+    counts = np.asarray(counts, dtype=np.int64)  # (E,)
+
+    N = int(counts.sum())
+    if N <= 1:
+        # Degenerate case; fall back to simple average/std
+        pooled_mean = means.mean(axis=0)
+        pooled_std = np.sqrt(vars_.mean(axis=0))
+    else:
+        # Weighted (pooled) mean
+        w = counts[:, None]                          # (E, 1)
+        pooled_mean = (w * means).sum(axis=0) / N    # (D,)
+
+        # Unbiased pooled variance:
+        # SS_within = sum_i (n_i - 1) * var_i
+        # SS_between = sum_i n_i * (mean_i - pooled_mean)^2
+        ss_within = ((counts - 1)[:, None] * vars_).sum(axis=0)
+        ss_between = (w * (means - pooled_mean) ** 2).sum(axis=0)
+        denom = max(N - 1, 1)
+        pooled_var = (ss_within + ss_between) / denom
+        pooled_std = np.sqrt(np.maximum(pooled_var, 0.0))
+
+    out = {
+        "mean": pooled_mean.astype(np.float64),
+        "std": pooled_std.astype(np.float64),
+        "count": N,
     }
 
+    # Optional min/max aggregation (elementwise)
+    if have_min:
+        # if some episodes lacked min/max, we only use the ones that exist
+        mins = [m for m in mins if m is not None]
+        # validate shapes
+        shapes = {tuple(np.squeeze(np.asarray(m)).shape) for m in mins}
+        if len(shapes) != 1:
+            raise ValueError(f"Inconsistent 'min' shapes across episodes: {shapes}.")
+        out["min"] = np.min(np.stack(mins), axis=0).astype(np.float64)
+
+    if have_max:
+        maxs = [m for m in maxs if m is not None]
+        shapes = {tuple(np.squeeze(np.asarray(m)).shape) for m in maxs}
+        if len(shapes) != 1:
+            raise ValueError(f"Inconsistent 'max' shapes across episodes: {shapes}.")
+        out["max"] = np.max(np.stack(maxs), axis=0).astype(np.float64)
+
+    return out
 
 def aggregate_stats(stats_list: list[dict[str, dict]]) -> dict[str, dict[str, np.ndarray]]:
     """Aggregate stats from multiple compute_stats outputs into a single set of stats.
