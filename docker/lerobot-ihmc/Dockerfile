@@ -30,15 +30,17 @@ ENV PATH=$CONDA_DIR/bin:$PATH
 
 RUN conda init bash
 
-RUN conda update -n base conda -y \
+RUN conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main \
+ && conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r \
+ && conda update -n base conda -y \
  && conda clean --all --yes
 
 RUN conda create -y -n lerobot python=3.10
 
 RUN conda run -n lerobot conda install ffmpeg -c conda-forge
 
-RUN git clone https://github.com/ihmcrobotics/lerobot.git
-WORKDIR lerobot
+COPY . lerobot
+WORKDIR /lerobot
 
 RUN conda run -n lerobot pip install -e ".[aloha, pusht]"
 

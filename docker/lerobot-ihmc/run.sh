@@ -4,7 +4,9 @@ set -e
 # Print commands as they are run.
 set -o xtrace
 
-docker build --tag ihmcrobotics/lerobot-ihmc:0.1 .
+cd ../..
+
+docker build --tag ihmcrobotics/lerobot-ihmc:0.2 --file docker/lerobot-ihmc/Dockerfile .
 
 docker run \
     --tty \
@@ -17,4 +19,4 @@ docker run \
     --shm-size=20g \
     --volume /home/$USER/lerobot:/lerobot \
     --volume /home/$USER/datasets:/datasets \
-    ihmcrobotics/lerobot-ihmc:0.1 bash
+    ihmcrobotics/lerobot-ihmc:0.2 bash
