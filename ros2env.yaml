@@ -9,9 +9,6 @@ dependencies:
 - einops>=0.8.0
 - opencv>=4.9.0
 - av>=14.2.0
-- pytorch>=2.2.1
-- torchvision>=0.21.0
-- torchcodec>=0.2.1
 - jsonlines>=4.0.0
 - packaging>=24.2
 - pynput>=1.7.7
@@ -27,5 +24,9 @@ dependencies:
 - rerun-sdk>=0.21.0,<0.23.0
 - deepdiff>=7.0.1,<9.0.0
 - pip:
+  - torch==2.7.1 --index-url https://download.pytorch.org/whl/cu128 # Support 50 series cards
+  - torchvision --index-url https://download.pytorch.org/whl/cu128
+  - torchaudio --index-url https://download.pytorch.org/whl/cu128
+  - torchcodec --index-url https://download.pytorch.org/whl/cu128
   - huggingface-hub[hf-transfer,cli]>=0.27.1,<0.34.0
   - draccus==0.10.0
