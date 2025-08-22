@@ -1,4 +1,5 @@
 import argparse
+import os.path
 import threading
 import time
 from copy import copy
@@ -216,18 +217,10 @@ class Ros2Robot(Node):
         self.destroy_node()
         rclpy.shutdown()
 
-
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Launch the IHMC ROS2 robot node"
     )
-    parser.add_argument(
-        "--ros_domain_id",
-        type=int,
-        default=44,
-        help="ROS 2 domain ID (default: 44)",
-    )
-
     parser.add_argument(
         "--trained_policy",
         type=str,
@@ -236,7 +229,16 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    rclpy.init(args=None, domain_id=args.ros_domain_id)
+    ini_path = os.path.expanduser("~/.ihmc/IHMCNetworkParameters.ini")
+    with open(ini_path, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith('RTPSDomainID='):
+                value = line.split('=', 1)[1]
+                ros_domain_id = int(value)
+    print(f"Using RTPSDomainID from ~/.ihmc/IHMCNetworkParameters.ini: {ros_domain_id}")
+
+    rclpy.init(args=None, domain_id=ros_domain_id)
     context = rclpy.get_default_context()
 
     config = Ros2RobotConfig()
