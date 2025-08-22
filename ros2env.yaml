@@ -1,0 +1,31 @@
+name: lerobot_ros2
+channels:
+- nvidia
+- conda-forge
+- robostack-staging
+dependencies:
+- ros-humble-desktop
+- cmake>=3.29.0.1
+- einops>=0.8.0
+- opencv>=4.9.0
+- av>=14.2.0
+- pytorch>=2.2.1
+- torchvision>=0.21.0
+- torchcodec>=0.2.1
+- jsonlines>=4.0.0
+- packaging>=24.2
+- pynput>=1.7.7
+- pyserial>=3.5
+- wandb>=0.20.0
+- gymnasium>=0.29.1,<1.0.0
+- flask>=3.0.3,<4.0.0
+- imageio>=2.34.0,<3.0.0
+- imageio-ffmpeg
+- termcolor>=2.4.0,<4.0.0
+- datasets>=2.19.0,<=3.6.0
+- diffusers>=0.27.2,<0.34.0
+- rerun-sdk>=0.21.0,<0.23.0
+- deepdiff>=7.0.1,<9.0.0
+- pip:
+  - huggingface-hub[hf-transfer,cli]>=0.27.1,<0.34.0
+  - draccus==0.10.0

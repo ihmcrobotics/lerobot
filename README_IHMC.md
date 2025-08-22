@@ -80,6 +80,8 @@ dataset $ scp -r gpu2:~/datasets/$(basename "$PWD")/outputs/train/datasets/$(bas
 
 ## Inference
 
+### Install mamba
+
 1. Install [miniconda](https://www.anaconda.com/docs/getting-started/miniconda/main).
 ```
 $ curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
@@ -87,57 +89,49 @@ $ chmod +x Miniconda3-latest-*.sh
 $ ./Miniconda3-latest-*.sh
 ```
 ```
-conda init
+$ conda init
 ```
 Close and re-open terminal
 
 2. Install [mamba](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html).
 ```
-conda install mamba -c conda-forge
+$ conda install mamba -c conda-forge
 ```
 
-I needed to make sure this was setup (and restart shell after):
+I needed to setup the shell and restart it:
 ```
 $ mamba shell init --shell bash --root-prefix=~/.local/share/mamba
 ```
 
-For some reason on Arch Linux I needed to do this:
+For some reason on Arch Linux I needed to attain more permissions:
 ```
 # chown -R duncan:duncan /opt/miniconda3/
 ```
 
-1. Install ROS 2 via [Robostack](https://robostack.github.io/GettingStarted.html).
+### Create mamba environment with ROS 2
+
 ```
-    mamba create -n ros_env 
-    mamba activate ros_env 
-    
-    conda config --env --add channels conda-forge
-    conda config --env --remove channels defaults
-    
-    conda config --env --add channels robostack-humble
-    mamba install ros-humble-desktop
-    
-    mamba deactivate
-    mamba reactivate
+$ mamba env create -f ros2env.yaml
+$ mamba activate lerobot_ros2
 ```
 Make sure you can run `rviz2`.
 ```
-mamba activate ros_env
-rviz2
+$ rviz2
 ```
 
-1. Setup lerobot dependencies:
-
+Setup the lerobot repo, skipping the dependencies:
 ```
-cd lerobot
-
-mamba install -c conda-forge cmake h5py imageio numba omegaconf opencv \
-packaging pymunk pyzmq termcolor pytorch torchvision zarr flask
-
-pip install datasets deepdiff diffusers draccus==0.10.0 einops gdown gymnasium==0.29.1 \
-"huggingface-hub[hf-transfer,cli]" jsonlines av pynput rerun-sdk wandb torchcodec==0.2.1 pyserial
-
-pip install -e . --no-deps
+lerobot $ pip install -e . --no-deps
 ```
 
+Set the domain ID:
+```
+$ export ROS_DOMAIN_ID=#
+```
+
+Run the policy:
+```
+$ python src/lerobot/robots/ihmc_ros_robot/ihmc_ros_robot.py \
+--trained_policy=/path/to/dataset/last/pretrained_model/
+```
 
