@@ -124,14 +124,8 @@ Setup the lerobot repo, skipping the dependencies:
 lerobot $ pip install -e . --no-deps
 ```
 
-Set the domain ID:
-```
-$ export ROS_DOMAIN_ID=#
-```
-
 Run the policy:
 ```
-$ python src/lerobot/robots/ihmc_ros_robot/ihmc_ros_robot.py \
---trained_policy=/path/to/dataset/last/pretrained_model/
+$ python src/lerobot/scripts/run_inference_ihmc.py --policy=/path/to/dataset/last/pretrained_model/
 ```
 
