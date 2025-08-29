@@ -59,17 +59,21 @@ class InferenceNode(Node):
         self.rate = self.create_rate(50.0, self.get_clock()) # tool to sleep at 50 Hz
         self.main_thread = threading.Thread(target=self.main_loop, daemon=True)
 
-        qos = QoSProfile(depth=1, reliability=QoSReliabilityPolicy.BEST_EFFORT) # Match IHMC default
-        self.action_publisher = self.create_publisher(Float32MultiArray, "/lerobot/action", qos)
-        self.status_publisher = self.create_publisher(String, "/lerobot/status", qos)
-        self.left_color_subscription = self.create_subscription(Image, "/zed/color/left/image", self.left_color_callback, qos)
-        self.right_color_subscription = self.create_subscription(Image, "/zed/color/right/image", self.right_color_callback, qos)
+        bestEffort = QoSProfile(depth=1, reliability=QoSReliabilityPolicy.BEST_EFFORT)
+        reliable = QoSProfile(depth=1, reliability=QoSReliabilityPolicy.RELIABLE)
+        self.action_publisher = self.create_publisher(Float32MultiArray, "/lerobot/action", bestEffort)
+        self.status_publisher = self.create_publisher(String, "/lerobot/status", bestEffort)
+        self.left_color_subscription = self.create_subscription(Image, "/zed/color/left/image", self.left_color_callback, reliable)
+        self.right_color_subscription = self.create_subscription(Image, "/zed/color/right/image", self.right_color_callback, reliable)
         self.state_hand_poses_subscription = self.create_subscription(Float32MultiArray, "/lerobot/state",
-                                                                      lambda msg: setattr(self, 'state_hand_poses', msg), qos)
-        self.command_subscription = self.create_subscription(Int32, "/lerobot/command", lambda msg: setattr(self, 'command', msg), qos)
+                                                                      lambda msg: setattr(self, 'state_hand_poses', msg), bestEffort)
+        self.command_subscription = self.create_subscription(Int32, "/lerobot/command", self.command_callback, bestEffort)
 
         self.print_and_publish("Starting main loop...")
         self.main_thread.start()
+
+    def command_callback(self, msg: Int32) -> None:
+        self.command = msg.data
 
     def left_color_callback(self, msg: Image) -> None:
         cv_img = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
@@ -104,7 +108,10 @@ class InferenceNode(Node):
              or self.zed_left_color is None
              or self.zed_right_color is None
             ):
-                self.status_publisher.publish(String(data="Paused."))
+                self.status_publisher.publish(String(data=f"Paused: command={self.command},"
+                                                          f"state={'empty' if self.state_hand_poses is None else 'ready'},"
+                                                          f"left={'empty' if self.zed_left_color is None else 'ready'},"
+                                                          f"right={'empty' if self.zed_right_color is None else 'ready'}"))
                 self.rate.sleep()
             else:
                 self.status_publisher.publish(String(data="Running!"))
