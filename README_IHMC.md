@@ -38,7 +38,7 @@ dataset $ rsync -avz --exclude='.git' "$PWD" gpu2:~/datasets/
 
 ### Running training
 
-Copy your locally cloned lerobot repo on the IHMC `ros2rebase` branch to the gpu server:
+Copy your locally cloned lerobot repo to the gpu server:
 ```
 lerobot $ rsync -avz --exclude='.git' "$PWD" gpu2:~
 ```
@@ -73,12 +73,23 @@ $ conda activate lerobot
 
 Pass the `--resume=true` to continue from a previous run if needed.
 
+Use `Ctrl=B` then `[` to scroll up and down the log. Hit `q` to escape that mode.
+
+To detach, press `Ctrl+B`, then `D`.
+to reattach, use `tmux a -t lerobot`.
+
 After training has finished, on your computer, copy the trained model back into your dataset folder:
 ```
 dataset $ scp -r gpu2:~/datasets/$(basename "$PWD")/outputs/train/datasets/$(basename "$PWD")/checkpoints/last .
 ```
 
 ## Inference
+
+If running on the robot, first copy the lerobot repo and your model to the robot:
+```
+lerobot $ rsync -avz --exclude='.git' "$PWD" unitree-jetson:~
+pretrained_model $ rsync -avz "$PWD" unitree-jetson:~
+```
 
 ### Install mamba
 
