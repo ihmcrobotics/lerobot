@@ -91,6 +91,16 @@ lerobot $ rsync -avz --exclude='.git' "$PWD" unitree-jetson:~
 pretrained_model $ rsync -avz "$PWD" unitree-jetson:~
 ```
 
+### Jetson Orin Setup
+
+Download libcusparse_lt from: https://developer.download.nvidia.com/compute/cusparselt/redist/libcusparse_lt/linux-sbsa/
+
+```
+$ tar xf libcusparse_lt-linux-sbsa-0.8.1.1_cuda12-archive.tar.xz
+# cp -a libcusparse_lt-linux-sbsa-0.8.1.1_cuda12-archive/include/* /usr/local/cuda/include/
+# cp -a libcusparse_lt-linux-sbsa-0.8.1.1_cuda12-archive/lib/* /usr/local/cuda/lib64/
+```
+
 ### Install mamba
 
 1. Install [miniconda](https://www.anaconda.com/docs/getting-started/miniconda/main).
