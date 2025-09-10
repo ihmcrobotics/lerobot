@@ -51,12 +51,13 @@ class InferenceNode(Node):
         self.policy_path = policy_path
         self.policy = None
         self.command: int = 1 # 0: stop, 1: pause, 2: run
+        self.was_paused = True
         self.shutdown = False
         self.bridge = CvBridge()
         self.state_hand_poses: Optional[Float32MultiArray] = None
         self.zed_left_color: Optional[np.ndarray] = None
         self.zed_right_color: Optional[np.ndarray] = None
-        self.rate = self.create_rate(50.0, self.get_clock()) # tool to sleep at 50 Hz
+        self.throttler = self.create_rate(30.0, self.get_clock())
         self.main_thread = threading.Thread(target=self.main_loop, daemon=True)
 
         bestEffort = QoSProfile(depth=1, reliability=QoSReliabilityPolicy.BEST_EFFORT)
@@ -77,11 +78,11 @@ class InferenceNode(Node):
 
     def left_color_callback(self, msg: Image) -> None:
         cv_img = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
-        self.zed_left_color = np.transpose(cv_img, (2, 0, 1))
+        self.zed_left_color = np.transpose(cv_img, (2, 0, 1)) # OpenCV (H, W, C) -> PyTorch (C, H, W)
 
     def right_color_callback(self, msg: Image) -> None:
         cv_img = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
-        self.zed_right_color = np.transpose(cv_img, (2, 0, 1))
+        self.zed_right_color = np.transpose(cv_img, (2, 0, 1)) # OpenCV (H, W, C) -> PyTorch (C, H, W)
 
     def print_and_publish(self, msg: str) -> None:
         print(msg)
@@ -98,10 +99,6 @@ class InferenceNode(Node):
         self.print_and_publish("Loaded policy!")
         print(self.policy)
 
-        self.policy.to(device)
-        self.policy.reset()
-        self.policy.eval()
-
         while not (self.command == 0 or self.shutdown):
             if (self.command != 2
              or self.state_hand_poses is None
@@ -112,28 +109,32 @@ class InferenceNode(Node):
                                                           f"state={'empty' if self.state_hand_poses is None else 'ready'},"
                                                           f"left={'empty' if self.zed_left_color is None else 'ready'},"
                                                           f"right={'empty' if self.zed_right_color is None else 'ready'}"))
-                self.rate.sleep()
+                self.was_paused = True
+                self.throttler.sleep()
             else:
                 self.status_publisher.publish(String(data="Running!"))
 
-                observation = {
-                    "observation.state": torch.tensor(list(self.state_hand_poses.data), dtype=torch.float32, device=device),
-                    "observation.images.cam_zed_left": torch.tensor(self.zed_left_color, dtype=torch.float32, device=device),
-                    "observation.images.cam_zed_right": torch.tensor(self.zed_right_color, dtype=torch.float32, device=device),
-                }
+                if self.was_paused:
+                    self.was_paused = False
+                    self.policy.reset() # Need to reset first so the actions can roll out properly
 
-                with inference_mode(), autocast(device_type=device.type):
-                    for name, tensor in list(observation.items()):
-                        if "images" in name:
-                            tensor = tensor / 255.0 # normalize
-                            if tensor.ndim == 3 and tensor.shape[2] in (1, 3):
-                                tensor = tensor.permute(2, 0, 1).contiguous()
-                        observation[name] = tensor.unsqueeze(0).to(device)
-                    action = self.policy.select_action(observation).squeeze(0).detach().cpu().numpy()
-                    action_hand_pose_data = action.astype(np.float32).flatten().tolist()
-                    self.action_publisher.publish(Float32MultiArray(data=action_hand_pose_data))
+                else:
+                    observation = {
+                        "observation.state": torch.tensor(list(self.state_hand_poses.data), dtype=torch.float32, device=device),
+                        "observation.images.cam_zed_left": torch.tensor(self.zed_left_color, dtype=torch.float32, device=device),
+                        "observation.images.cam_zed_right": torch.tensor(self.zed_right_color, dtype=torch.float32, device=device),
+                    }
 
-                self.rate.sleep()
+                    with inference_mode(), autocast(device_type=device.type):
+                        for name, tensor in list(observation.items()):
+                            if "images" in name:
+                                tensor = tensor / 255.0 # int 0-255 -> float 0.0-1.0
+                            observation[name] = tensor.unsqueeze(0).to(device)
+                        action = self.policy.select_action(observation).squeeze(0).detach().cpu().numpy()
+                        action_hand_pose_data = action.astype(np.float32).flatten().tolist()
+                        self.action_publisher.publish(Float32MultiArray(data=action_hand_pose_data))
+
+                self.throttler.sleep()
 
         self.print_and_publish("Exited.")
 
