@@ -3,6 +3,7 @@ import os.path
 import threading
 from typing import Optional
 
+import cv2
 import numpy as np
 import rclpy
 import torch
@@ -77,12 +78,21 @@ class InferenceNode(Node):
         self.command = msg.data
 
     def left_color_callback(self, msg: Image) -> None:
-        cv_img = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
-        self.zed_left_color = np.transpose(cv_img, (2, 0, 1)) # OpenCV (H, W, C) -> PyTorch (C, H, W)
+        self.zed_left_color = self.prepare_image(msg, "Left Color")
 
     def right_color_callback(self, msg: Image) -> None:
+        self.zed_right_color = self.prepare_image(msg, "Right Color")
+
+    def prepare_image(self, msg: Image, window_name: str) -> np.ndarray:
         cv_img = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
-        self.zed_right_color = np.transpose(cv_img, (2, 0, 1)) # OpenCV (H, W, C) -> PyTorch (C, H, W)
+        crop_width, crop_height = 640, 480
+        resized_img = cv2.resize(cv_img, (cv_img.shape[1] * crop_height // cv_img.shape[0], crop_height))  # keep aspect ratio
+        crop_x = (resized_img.shape[1] - crop_width) // 2
+        cropped_img = resized_img[0:crop_height, crop_x:crop_x + crop_width]
+        cv2.imshow(window_name, cropped_img)
+        cv2.waitKey(1)
+        cv2.destroyAllWindows()
+        return np.transpose(cropped_img, (2, 0, 1))  # OpenCV (H, W, C) -> PyTorch (C, H, W)
 
     def print_and_publish(self, msg: str) -> None:
         print(msg)
