@@ -58,7 +58,7 @@ class InferenceNode(Node):
         self.state_hand_poses: Optional[Float32MultiArray] = None
         self.zed_left_color: Optional[np.ndarray] = None
         self.zed_right_color: Optional[np.ndarray] = None
-        self.throttler = self.create_rate(30.0, self.get_clock())
+        self.throttler = self.create_rate(5.0, self.get_clock())
         self.main_thread = threading.Thread(target=self.main_loop, daemon=True)
 
         bestEffort = QoSProfile(depth=1, reliability=QoSReliabilityPolicy.BEST_EFFORT)
