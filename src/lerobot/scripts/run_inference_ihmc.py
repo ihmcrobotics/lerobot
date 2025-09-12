@@ -89,9 +89,9 @@ class InferenceNode(Node):
         resized_img = cv2.resize(cv_img, (cv_img.shape[1] * crop_height // cv_img.shape[0], crop_height))  # keep aspect ratio
         crop_x = (resized_img.shape[1] - crop_width) // 2
         cropped_img = resized_img[0:crop_height, crop_x:crop_x + crop_width]
-        cv2.imshow(window_name, cropped_img)
-        cv2.waitKey(1)
-        cv2.destroyAllWindows()
+        # cv2.imshow(window_name, cropped_img)
+        # cv2.waitKey(1000)
+        # cv2.destroyAllWindows()
         return np.transpose(cropped_img, (2, 0, 1))  # OpenCV (H, W, C) -> PyTorch (C, H, W)
 
     def print_and_publish(self, msg: str) -> None:
