@@ -21,6 +21,7 @@ TODO(alexander-soare):
 """
 
 import math
+import time
 from collections import deque
 from collections.abc import Callable
 
@@ -145,7 +146,10 @@ class DiffusionPolicy(PreTrainedPolicy):
         self._queues = populate_queues(self._queues, batch)
 
         if len(self._queues[ACTION]) == 0:
+            start = time.perf_counter()
             actions = self.predict_action_chunk(batch)
+            elapsed = time.perf_counter() - start
+            print(f"predict_action_chunk {elapsed:.6f} s")
             self._queues[ACTION].extend(actions.transpose(0, 1))
 
         action = self._queues[ACTION].popleft()
@@ -596,6 +600,10 @@ class DiffusionConditionalUnet1d(nn.Module):
         super().__init__()
 
         self.config = config
+        # self.config.horizon = 32
+        # self.config.n_action_steps = 7
+        #
+        self.config.num_inference_steps =16
 
         # Encoder for the diffusion timestep.
         self.diffusion_step_encoder = nn.Sequential(
